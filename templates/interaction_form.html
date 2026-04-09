@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block title %}{% if interaction %}Upravit{% else %}Nový{% endif %} kontakt – CRM PROLUS Dynamics{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <a href="{{ url_for('client_detail', id=client.id) }}" class="btn btn-sm btn-outline-secondary me-3">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h2 class="fw-bold mb-0">
+      {% if interaction %}Upravit kontakt{% else %}Zaznamenat kontakt{% endif %}
+    </h2>
+    <div class="text-muted small">Klient: <strong>{{ client.name }}</strong></div>
+  </div>
+</div>
+
+<div class="card" style="max-width:580px">
+  <div class="card-body p-4">
+    {% if not members %}
+    <div class="alert alert-warning">
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      Nejprve <a href="{{ url_for('new_member') }}">přidejte člena týmu</a>, který kontakt provedl.
+    </div>
+    {% else %}
+    <form method="post">
+      <div class="row g-3 mb-3">
+        <div class="col">
+          <label class="form-label fw-semibold">Datum a čas <span class="text-danger">*</span></label>
+          <input type="datetime-local" name="date" class="form-control"
+                 value="{{ now }}" required>
+        </div>
+        <div class="col">
+          <label class="form-label fw-semibold">Způsob <span class="text-danger">*</span></label>
+          <select name="method" class="form-select" required>
+            {% for m in ['email', 'telefon', 'osobně', 'video'] %}
+            <option value="{{ m }}"
+              {% if interaction and interaction.method == m %}selected{% endif %}>
+              {{ m|capitalize }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Kdo oslovil <span class="text-danger">*</span></label>
+        <select name="member_id" class="form-select" required>
+          {% for m in members %}
+          <option value="{{ m.id }}"
+            {% if interaction and interaction.member_id == m.id %}selected{% endif %}>
+            {{ m.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Kontaktní osoba</label>
+        <select name="contact_person_id" class="form-select">
+          <option value="">— nevybráno —</option>
+          {% for c in contacts %}
+          <option value="{{ c.id }}"
+            {% if interaction and interaction.contact_person_id == c.id %}selected{% endif %}>
+            {{ c.name }}{% if c.role %} ({{ c.role }}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+        {% if not contacts %}
+        <div class="form-text text-muted">Klient nemá žádné kontaktní osoby. <a href="{{ url_for('new_contact', client_id=client.id) }}">Přidat osobu.</a></div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Předmět</label>
+        <input type="text" name="subject" class="form-control"
+               value="{{ interaction.subject if interaction else '' }}"
+               placeholder="Krátký popis kontaktu…">
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Poznámky</label>
+        <textarea name="notes" class="form-control" rows="3"
+                  placeholder="Detaily, výsledek, příští kroky…">{{ interaction.notes if interaction else '' }}</textarea>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i>Uložit
+        </button>
+        <a href="{{ url_for('client_detail', id=client.id) }}" class="btn btn-outline-secondary">Zrušit</a>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}{% if client %}Upravit{% else %}Nový{% endif %} klient – CRM PROLUS Dynamics{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <a href="{{ url_for('clients') }}" class="btn btn-sm btn-outline-secondary me-3">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h2 class="fw-bold mb-0">
+    {% if client %}Upravit klienta{% else %}Nový klient{% endif %}
+  </h2>
+</div>
+
+<div class="card" style="max-width:600px">
+  <div class="card-body p-4">
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Název firmy <span class="text-danger">*</span></label>
+        <input type="text" name="company" class="form-control"
+               value="{{ client.company if client else '' }}" required autofocus>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col">
+          <label class="form-label fw-semibold">E-mail</label>
+          <input type="email" name="email" class="form-control"
+                 value="{{ client.email if client else '' }}">
+        </div>
+        <div class="col">
+          <label class="form-label fw-semibold">Telefon</label>
+          <input type="text" name="phone" class="form-control"
+                 value="{{ client.phone if client else '' }}">
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Poznámky</label>
+        <textarea name="notes" class="form-control" rows="3">{{ client.notes if client else '' }}</textarea>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i>Uložit
+        </button>
+        <a href="{{ url_for('clients') }}" class="btn btn-outline-secondary">Zrušit</a>
+        {% if client %}
+        <form method="post" action="{{ url_for('delete_client', id=client.id) }}"
+              class="ms-auto"
+              onsubmit="return confirm('Opravdu smazat klienta včetně všech kontaktů?')">
+          <button type="submit" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash me-1"></i>Smazat
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

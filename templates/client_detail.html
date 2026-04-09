@@ -1,0 +1,265 @@
+{% extends 'base.html' %}
+{% block title %}{{ client.name }} – CRM PROLUS Dynamics{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-start mb-4 gap-3">
+  <a href="{{ url_for('clients') }}" class="btn btn-sm btn-outline-secondary mt-1">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div class="me-auto">
+    <h2 class="fw-bold mb-0">{{ client.name }}</h2>
+    {% if client.company %}<div class="text-muted">{{ client.company }}</div>{% endif %}
+  </div>
+  <a href="{{ url_for('edit_client', id=client.id) }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-pencil me-1"></i>Upravit
+  </a>
+  <a href="{{ url_for('new_interaction', client_id=client.id) }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>Zaznamenat kontakt
+  </a>
+</div>
+
+<!-- Row 1: Info + Contacts -->
+<div class="row g-4 mb-4">
+  <!-- Client info -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="text-muted text-uppercase small fw-semibold mb-3">Kontaktní údaje</h6>
+        {% if client.email %}
+        <div class="mb-2">
+          <i class="bi bi-envelope text-muted me-2"></i>
+          <a href="mailto:{{ client.email }}" class="text-decoration-none">{{ client.email }}</a>
+        </div>
+        {% endif %}
+        {% if client.phone %}
+        <div class="mb-2">
+          <i class="bi bi-telephone text-muted me-2"></i>{{ client.phone }}
+        </div>
+        {% endif %}
+        {% if not client.email and not client.phone %}
+        <p class="text-muted small mb-0">Žádné kontaktní údaje.</p>
+        {% endif %}
+        {% if client.notes %}
+        <hr>
+        <h6 class="text-muted text-uppercase small fw-semibold mb-2">Poznámky</h6>
+        <p class="small mb-0">{{ client.notes }}</p>
+        {% endif %}
+        <hr>
+        <div class="text-muted small">Přidán {{ client.created_at.strftime('%d.%m.%Y') }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contact persons -->
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-header bg-white d-flex align-items-center py-3">
+        <span class="fw-semibold me-auto">
+          <i class="bi bi-person-lines-fill me-2 text-muted"></i>Kontaktní osoby
+          <span class="badge bg-light text-dark border ms-1">{{ client.contacts | length }}</span>
+        </span>
+        <a href="{{ url_for('new_contact', client_id=client.id) }}" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-plus-lg me-1"></i>Přidat osobu
+        </a>
+      </div>
+      <div class="card-body p-0">
+        {% if client.contacts %}
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Jméno</th>
+              <th>Pozice</th>
+              <th>E-mail</th>
+              <th>Telefon</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in client.contacts %}
+            <tr>
+              <td class="fw-semibold small">{{ c.name }}</td>
+              <td class="small text-muted">{{ c.role or '—' }}</td>
+              <td class="small">
+                {% if c.email %}
+                <a href="mailto:{{ c.email }}" class="text-decoration-none">{{ c.email }}</a>
+                {% else %}—{% endif %}
+              </td>
+              <td class="small">{{ c.phone or '—' }}</td>
+              <td class="text-end">
+                <a href="{{ url_for('edit_contact', id=c.id) }}"
+                   class="btn btn-sm btn-outline-secondary" title="Upravit">
+                  <i class="bi bi-pencil"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted p-4 mb-0 small">
+          Žádné kontaktní osoby.
+          <a href="{{ url_for('new_contact', client_id=client.id) }}">Přidat první osobu.</a>
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Row 2: Reminders -->
+<div class="card mb-4">
+  <div class="card-header bg-white d-flex align-items-center py-3">
+    <span class="fw-semibold me-auto">
+      <i class="bi bi-bell me-2 text-muted"></i>Remindry
+      {% set pending_count = reminders | selectattr('done', 'equalto', false) | list | length %}
+      {% if pending_count > 0 %}
+      <span class="badge bg-warning text-dark ms-1">{{ pending_count }}</span>
+      {% else %}
+      <span class="badge bg-light text-dark border ms-1">{{ reminders | length }}</span>
+      {% endif %}
+    </span>
+    <a href="{{ url_for('new_reminder', client_id=client.id) }}" class="btn btn-sm btn-outline-warning">
+      <i class="bi bi-plus-lg me-1"></i>Přidat reminder
+    </a>
+  </div>
+  <div class="card-body p-0">
+    {% if reminders %}
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width:1%"></th>
+          <th>Termín</th>
+          <th>Název</th>
+          <th>Přiřazeno</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reminders %}
+        {% set overdue = not r.done and r.due_at < now %}
+        <tr class="{{ 'table-danger' if overdue else ('text-muted' if r.done else '') }}">
+          <td>
+            <form method="post" action="{{ url_for('toggle_reminder', id=r.id) }}">
+              <button class="btn btn-sm border-0
+                {% if r.done %}btn-outline-success{% else %}btn-outline-secondary{% endif %}"
+                title="{{ 'Označit jako nevyřízené' if r.done else 'Označit jako hotovo' }}">
+                <i class="bi {{ 'bi-check-circle-fill text-success' if r.done else 'bi-circle' }}"></i>
+              </button>
+            </form>
+          </td>
+          <td class="text-nowrap small {% if overdue %}text-danger fw-semibold{% endif %}">
+            {% if r.done %}<s>{% endif %}
+            {{ r.due_at.strftime('%d.%m.%Y') }}<br>
+            <span class="{% if not overdue and not r.done %}text-muted{% endif %}">{{ r.due_at.strftime('%H:%M') }}</span>
+            {% if r.done %}</s>{% endif %}
+            {% if overdue %}<span class="badge bg-danger ms-1">Po termínu</span>{% endif %}
+          </td>
+          <td class="small">
+            {% if r.done %}<s>{% endif %}
+            <div class="fw-semibold">{{ r.title }}</div>
+            {% if r.notes %}<div class="text-muted">{{ r.notes }}</div>{% endif %}
+            {% if r.done %}</s>{% endif %}
+          </td>
+          <td class="small">
+            {% if r.assigned_member %}
+            <span class="badge bg-light text-dark border">
+              <i class="bi bi-person me-1"></i>{{ r.assigned_member.name }}
+            </span>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            {% if not r.done %}
+            <a href="{{ url_for('edit_reminder', id=r.id) }}"
+               class="btn btn-sm btn-outline-secondary me-1" title="Upravit">
+              <i class="bi bi-pencil"></i>
+            </a>
+            {% endif %}
+            <form method="post" action="{{ url_for('delete_reminder', id=r.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('Smazat tento reminder?')">
+              <button class="btn btn-sm btn-outline-danger" title="Smazat">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted p-4 mb-0 small">
+      Žádné remindry.
+      <a href="{{ url_for('new_reminder', client_id=client.id) }}">Přidat první reminder.</a>
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Row 3: Interaction history -->
+<div class="card">
+  <div class="card-header bg-white d-flex align-items-center py-3">
+    <span class="fw-semibold me-auto">
+      <i class="bi bi-chat-dots me-2 text-muted"></i>Historie kontaktů
+      <span class="badge bg-light text-dark border ms-1">{{ interactions | length }}</span>
+    </span>
+  </div>
+  <div class="card-body p-0">
+    {% if interactions %}
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th>
+          <th>Kdo oslovil</th>
+          <th>Kontaktní osoba</th>
+          <th>Způsob</th>
+          <th>Předmět / Poznámka</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in interactions %}
+        <tr>
+          <td class="text-nowrap small">{{ i.date.strftime('%d.%m.%Y') }}<br>
+            <span class="text-muted">{{ i.date.strftime('%H:%M') }}</span>
+          </td>
+          <td class="fw-semibold small">{{ i.member.name }}</td>
+          <td class="small">
+            {% if i.contact_person %}
+            {{ i.contact_person.name }}{% if i.contact_person.role %} <span class="text-muted">({{ i.contact_person.role }})</span>{% endif %}
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td>{% include '_method_badge.html' %}</td>
+          <td class="small">
+            {% if i.subject %}<div class="fw-semibold">{{ i.subject }}</div>{% endif %}
+            {% if i.notes %}<div class="text-muted">{{ i.notes }}</div>{% endif %}
+            {% if not i.subject and not i.notes %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            <a href="{{ url_for('edit_interaction', id=i.id) }}"
+               class="btn btn-sm btn-outline-secondary me-1" title="Upravit">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <form method="post" action="{{ url_for('delete_interaction', id=i.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('Smazat tento záznam?')">
+              <button class="btn btn-sm btn-outline-danger" title="Smazat">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted p-4 mb-0">
+      Zatím žádný kontakt.
+      <a href="{{ url_for('new_interaction', client_id=client.id) }}">Zaznamenat první kontakt.</a>
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}{% if reminder %}Upravit reminder{% else %}Nový reminder{% endif %} – CRM PROLUS Dynamics{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <a href="{{ url_for('client_detail', id=client.id) }}" class="btn btn-sm btn-outline-secondary me-3">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h2 class="fw-bold mb-0">{% if reminder %}Upravit reminder{% else %}Nový reminder{% endif %}</h2>
+    <div class="text-muted small">{{ client.name }}{% if client.company %} — {{ client.company }}{% endif %}</div>
+  </div>
+</div>
+
+<div class="card" style="max-width:560px">
+  <div class="card-body p-4">
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Název / Úkol <span class="text-danger">*</span></label>
+        <input type="text" name="title" class="form-control"
+               value="{{ reminder.title if reminder else '' }}" required autofocus
+               placeholder="např. Zavolat ohledně nabídky">
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Termín <span class="text-danger">*</span></label>
+        <input type="datetime-local" name="due_at" class="form-control"
+               value="{{ default_due }}" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Přiřadit členovi týmu</label>
+        <select name="member_id" class="form-select">
+          <option value="">— Nepřiřazeno —</option>
+          {% for m in members %}
+          <option value="{{ m.id }}"
+            {% if reminder and reminder.member_id == m.id %}selected{% endif %}>
+            {{ m.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Poznámka</label>
+        <textarea name="notes" class="form-control" rows="3"
+                  placeholder="Volitelný popis nebo kontext…">{{ reminder.notes if reminder else '' }}</textarea>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i>Uložit
+        </button>
+        <a href="{{ url_for('client_detail', id=client.id) }}" class="btn btn-outline-secondary">Zrušit</a>
+        {% if reminder %}
+        <form method="post" action="{{ url_for('delete_reminder', id=reminder.id) }}"
+              class="ms-auto"
+              onsubmit="return confirm('Opravdu smazat tento reminder?')">
+          <button type="submit" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash me-1"></i>Smazat
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% block title %}Remindry – CRM PROLUS Dynamics{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4 gap-3">
+  <h2 class="fw-bold mb-0 me-auto">
+    <i class="bi bi-bell me-2"></i>Remindry
+  </h2>
+  <form class="d-flex gap-2" method="get">
+    <select name="member" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+      <option value="">Všichni členové</option>
+      {% for m in members %}
+      <option value="{{ m.id }}" {% if member_filter == m.id|string %}selected{% endif %}>{{ m.name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+<!-- Pending reminders -->
+<div class="card mb-4">
+  <div class="card-header bg-white d-flex align-items-center py-3">
+    <span class="fw-semibold me-auto">
+      <i class="bi bi-hourglass-split me-2 text-warning"></i>Nevyřízené
+      <span class="badge bg-warning text-dark border ms-1">{{ pending | length }}</span>
+    </span>
+  </div>
+  <div class="card-body p-0">
+    {% if pending %}
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width:1%"></th>
+          <th>Termín</th>
+          <th>Klient</th>
+          <th>Název</th>
+          <th>Přiřazeno</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in pending %}
+        {% set overdue = r.due_at < now %}
+        <tr class="{{ 'table-danger' if overdue else '' }}">
+          <td>
+            <form method="post" action="{{ url_for('toggle_reminder', id=r.id) }}">
+              <button class="btn btn-sm btn-outline-secondary border-0" title="Označit jako hotovo">
+                <i class="bi bi-circle"></i>
+              </button>
+            </form>
+          </td>
+          <td class="text-nowrap small {% if overdue %}text-danger fw-semibold{% endif %}">
+            {{ r.due_at.strftime('%d.%m.%Y') }}<br>
+            <span class="{% if not overdue %}text-muted{% endif %}">{{ r.due_at.strftime('%H:%M') }}</span>
+            {% if overdue %}<span class="badge bg-danger ms-1">Po termínu</span>{% endif %}
+          </td>
+          <td class="small">
+            <a href="{{ url_for('client_detail', id=r.client_id) }}" class="text-decoration-none fw-semibold">
+              {{ r.client.name }}
+            </a>
+            {% if r.client.company %}<div class="text-muted">{{ r.client.company }}</div>{% endif %}
+          </td>
+          <td>
+            <div class="fw-semibold small">{{ r.title }}</div>
+            {% if r.notes %}<div class="text-muted small">{{ r.notes }}</div>{% endif %}
+          </td>
+          <td class="small">
+            {% if r.assigned_member %}
+            <span class="badge bg-light text-dark border">
+              <i class="bi bi-person me-1"></i>{{ r.assigned_member.name }}
+            </span>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            <a href="{{ url_for('edit_reminder', id=r.id) }}"
+               class="btn btn-sm btn-outline-secondary me-1" title="Upravit">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <form method="post" action="{{ url_for('delete_reminder', id=r.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('Smazat tento reminder?')">
+              <button class="btn btn-sm btn-outline-danger" title="Smazat">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted p-4 mb-0">
+      <i class="bi bi-check-circle me-1 text-success"></i>
+      Žádné nevyřízené remindry. Skvělá práce!
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Done reminders -->
+{% if done_recent %}
+<div class="card">
+  <div class="card-header bg-white d-flex align-items-center py-3">
+    <span class="fw-semibold me-auto text-muted">
+      <i class="bi bi-check-circle me-2 text-success"></i>Vyřízené (posledních 30)
+    </span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width:1%"></th>
+          <th>Termín</th>
+          <th>Klient</th>
+          <th>Název</th>
+          <th>Přiřazeno</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in done_recent %}
+        <tr class="text-muted">
+          <td>
+            <form method="post" action="{{ url_for('toggle_reminder', id=r.id) }}">
+              <button class="btn btn-sm btn-outline-success border-0" title="Označit jako nevyřízené">
+                <i class="bi bi-check-circle-fill text-success"></i>
+              </button>
+            </form>
+          </td>
+          <td class="text-nowrap small">
+            <s>{{ r.due_at.strftime('%d.%m.%Y %H:%M') }}</s>
+          </td>
+          <td class="small">
+            <a href="{{ url_for('client_detail', id=r.client_id) }}" class="text-decoration-none text-muted">
+              {{ r.client.name }}
+            </a>
+          </td>
+          <td class="small"><s>{{ r.title }}</s></td>
+          <td class="small">
+            {% if r.assigned_member %}{{ r.assigned_member.name }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            <form method="post" action="{{ url_for('delete_reminder', id=r.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('Smazat tento reminder?')">
+              <button class="btn btn-sm btn-outline-danger" title="Smazat">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

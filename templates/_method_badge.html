@@ -1,0 +1,14 @@
+{% set colors = {
+  'email': 'primary',
+  'telefon': 'info',
+  'osobně': 'success',
+  'video': 'purple'
+} %}
+{% set color = colors.get(i.method, 'secondary') %}
+<span class="badge bg-{{ color }} bg-opacity-10 text-{{ color }} badge-method border border-{{ color }} border-opacity-25">
+  {% if i.method == 'email' %}<i class="bi bi-envelope me-1"></i>
+  {% elif i.method == 'telefon' %}<i class="bi bi-telephone me-1"></i>
+  {% elif i.method == 'osobně' %}<i class="bi bi-person-check me-1"></i>
+  {% elif i.method == 'video' %}<i class="bi bi-camera-video me-1"></i>
+  {% endif %}{{ i.method }}
+</span>
