@@ -1,8 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from datetime import datetime
 from functools import wraps
+import requests
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'crm-secret-key-2024'
@@ -10,7 +12,7 @@ app.config['SECRET_KEY'] = 'crm-secret-key-2024'
 # ── Přihlášení ──────────────────────────────────────────────────────────────
 
 LOGIN_USERNAME = 'admin'
-LOGIN_PASSWORD = 'zmenHeslo123'  # změň na vlastní heslo
+LOGIN_PASSWORD = 'ProlusiDynamika'
 
 
 def login_required(f):
@@ -52,8 +54,11 @@ class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     company = db.Column(db.String(200))
+    ico = db.Column(db.String(20))
     email = db.Column(db.String(200))
     phone = db.Column(db.String(50))
+    website = db.Column(db.String(500))
+    web_description = db.Column(db.Text)
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     interactions = db.relationship('Interaction', backref='client', lazy=True, cascade='all, delete-orphan')
@@ -151,8 +156,10 @@ def new_client():
         client = Client(
             name=company,
             company=company,
+            ico=request.form.get('ico', '').strip(),
             email=request.form.get('email', '').strip(),
             phone=request.form.get('phone', '').strip(),
+            website=request.form.get('website', '').strip(),
             notes=request.form.get('notes', '').strip(),
         )
         db.session.add(client)
@@ -187,13 +194,78 @@ def edit_client(id):
         company = request.form.get('company', '').strip()
         client.name = company
         client.company = company
+        client.ico = request.form.get('ico', '').strip()
         client.email = request.form.get('email', '').strip()
         client.phone = request.form.get('phone', '').strip()
+        client.website = request.form.get('website', '').strip()
         client.notes = request.form.get('notes', '').strip()
         db.session.commit()
         flash('Klient byl upraven.', 'success')
         return redirect(url_for('client_detail', id=client.id))
     return render_template('client_form.html', client=client)
+
+
+@app.route('/clients/<int:id>/load-ares', methods=['POST'])
+@login_required
+def load_ares(id):
+    client = Client.query.get_or_404(id)
+    ico = client.ico.strip() if client.ico else ''
+    if not ico:
+        flash('Nejdříve zadej IČO a ulož klienta.', 'warning')
+        return redirect(url_for('client_detail', id=id))
+    try:
+        resp = requests.get(
+            f'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}',
+            timeout=10
+        )
+        if resp.status_code == 404:
+            flash('IČO nebylo nalezeno v ARES.', 'danger')
+            return redirect(url_for('client_detail', id=id))
+        resp.raise_for_status()
+        data = resp.json()
+        nazev = data.get('obchodniJmeno', '')
+        adresa = (data.get('sidlo') or {}).get('textovaAdresa', '')
+        if nazev:
+            client.name = nazev
+            client.company = nazev
+        if adresa and not client.notes:
+            client.notes = adresa
+        db.session.commit()
+        flash(f'Údaje z ARES načteny: {nazev}', 'success')
+    except Exception as e:
+        flash(f'Chyba při načítání z ARES: {e}', 'danger')
+    return redirect(url_for('client_detail', id=id))
+
+
+@app.route('/clients/<int:id>/load-website', methods=['POST'])
+@login_required
+def load_website(id):
+    client = Client.query.get_or_404(id)
+    url = client.website.strip() if client.website else ''
+    if not url:
+        flash('Nejdříve zadej adresu webu a ulož klienta.', 'warning')
+        return redirect(url_for('client_detail', id=id))
+    if not url.startswith('http'):
+        url = 'https://' + url
+    try:
+        resp = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        description = ''
+        meta = soup.find('meta', attrs={'name': 'description'}) or \
+               soup.find('meta', attrs={'property': 'og:description'})
+        if meta and meta.get('content'):
+            description = meta['content'].strip()
+        if not description:
+            title = soup.title.string.strip() if soup.title else ''
+            paras = [p.get_text(' ', strip=True) for p in soup.find_all('p') if len(p.get_text()) > 60]
+            description = title + ('\n' + paras[0] if paras else '')
+        client.web_description = description[:1000]
+        db.session.commit()
+        flash('Popis webu byl načten.', 'success')
+    except Exception as e:
+        flash(f'Chyba při načítání webu: {e}', 'danger')
+    return redirect(url_for('client_detail', id=id))
 
 
 @app.route('/clients/<int:id>/delete', methods=['POST'])
@@ -458,13 +530,18 @@ def delete_member(id):
 
 with app.app_context():
     db.create_all()
-    # Migration: add contact_person_id to interaction table if it doesn't exist yet
     with db.engine.connect() as conn:
-        try:
-            conn.execute(text('ALTER TABLE interaction ADD COLUMN contact_person_id INTEGER REFERENCES contact_person(id)'))
-            conn.commit()
-        except Exception:
-            pass
+        for sql in [
+            'ALTER TABLE interaction ADD COLUMN contact_person_id INTEGER REFERENCES contact_person(id)',
+            'ALTER TABLE client ADD COLUMN ico VARCHAR(20)',
+            'ALTER TABLE client ADD COLUMN website VARCHAR(500)',
+            'ALTER TABLE client ADD COLUMN web_description TEXT',
+        ]:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

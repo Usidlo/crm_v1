@@ -21,14 +21,26 @@
       </div>
       <div class="row g-3 mb-3">
         <div class="col">
-          <label class="form-label fw-semibold">E-mail</label>
-          <input type="email" name="email" class="form-control"
-                 value="{{ client.email if client else '' }}">
+          <label class="form-label fw-semibold">IČO</label>
+          <input type="text" name="ico" class="form-control" maxlength="20"
+                 value="{{ client.ico if client and client.ico else '' }}">
         </div>
         <div class="col">
           <label class="form-label fw-semibold">Telefon</label>
           <input type="text" name="phone" class="form-control"
                  value="{{ client.phone if client else '' }}">
+        </div>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col">
+          <label class="form-label fw-semibold">E-mail</label>
+          <input type="email" name="email" class="form-control"
+                 value="{{ client.email if client else '' }}">
+        </div>
+        <div class="col">
+          <label class="form-label fw-semibold">Web</label>
+          <input type="text" name="website" class="form-control" placeholder="https://..."
+                 value="{{ client.website if client and client.website else '' }}">
         </div>
       </div>
       <div class="mb-4">

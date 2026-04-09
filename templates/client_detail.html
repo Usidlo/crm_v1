@@ -25,6 +25,17 @@
     <div class="card h-100">
       <div class="card-body">
         <h6 class="text-muted text-uppercase small fw-semibold mb-3">Kontaktní údaje</h6>
+        {% if client.ico %}
+        <div class="mb-2">
+          <i class="bi bi-hash text-muted me-2"></i>
+          <span class="fw-semibold">IČO:</span> {{ client.ico }}
+          <form method="post" action="{{ url_for('load_ares', id=client.id) }}" class="d-inline ms-2">
+            <button class="btn btn-outline-secondary btn-sm py-0 px-1" title="Načíst z ARES">
+              <i class="bi bi-cloud-download"></i> ARES
+            </button>
+          </form>
+        </div>
+        {% endif %}
         {% if client.email %}
         <div class="mb-2">
           <i class="bi bi-envelope text-muted me-2"></i>
@@ -36,8 +47,25 @@
           <i class="bi bi-telephone text-muted me-2"></i>{{ client.phone }}
         </div>
         {% endif %}
-        {% if not client.email and not client.phone %}
+        {% if client.website %}
+        <div class="mb-2">
+          <i class="bi bi-globe text-muted me-2"></i>
+          <a href="{{ client.website if client.website.startswith('http') else 'https://' + client.website }}"
+             target="_blank" class="text-decoration-none">{{ client.website }}</a>
+          <form method="post" action="{{ url_for('load_website', id=client.id) }}" class="d-inline ms-2">
+            <button class="btn btn-outline-secondary btn-sm py-0 px-1" title="Načíst popis webu">
+              <i class="bi bi-cloud-download"></i> Popis
+            </button>
+          </form>
+        </div>
+        {% endif %}
+        {% if not client.email and not client.phone and not client.ico and not client.website %}
         <p class="text-muted small mb-0">Žádné kontaktní údaje.</p>
+        {% endif %}
+        {% if client.web_description %}
+        <hr>
+        <h6 class="text-muted text-uppercase small fw-semibold mb-2">Popis webu</h6>
+        <p class="small mb-0">{{ client.web_description }}</p>
         {% endif %}
         {% if client.notes %}
         <hr>
