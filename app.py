@@ -1,10 +1,45 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from datetime import datetime
+from functools import wraps
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'crm-secret-key-2024'
+
+# ── Přihlášení ──────────────────────────────────────────────────────────────
+
+LOGIN_USERNAME = 'admin'
+LOGIN_PASSWORD = 'zmenHeslo123'  # změň na vlastní heslo
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if session.get('logged_in'):
+        return redirect(url_for('dashboard'))
+    error = None
+    if request.method == 'POST':
+        if (request.form['username'] == LOGIN_USERNAME and
+                request.form['password'] == LOGIN_PASSWORD):
+            session['logged_in'] = True
+            return redirect(url_for('dashboard'))
+        error = 'Špatné jméno nebo heslo.'
+    return render_template('login.html', error=error)
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///crm.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -70,6 +105,7 @@ class Reminder(db.Model):
 # ── Routes: Dashboard ───────────────────────────────────────────────────────
 
 @app.route('/')
+@login_required
 def dashboard():
     clients_count = Client.query.count()
     interactions_count = Interaction.query.count()
@@ -93,6 +129,7 @@ def dashboard():
 # ── Routes: Clients ─────────────────────────────────────────────────────────
 
 @app.route('/clients')
+@login_required
 def clients():
     q = request.args.get('q', '').strip()
     query = Client.query
@@ -107,6 +144,7 @@ def clients():
 
 
 @app.route('/clients/new', methods=['GET', 'POST'])
+@login_required
 def new_client():
     if request.method == 'POST':
         company = request.form.get('company', '').strip()
@@ -125,6 +163,7 @@ def new_client():
 
 
 @app.route('/clients/<int:id>')
+@login_required
 def client_detail(id):
     client = Client.query.get_or_404(id)
     interactions = (Interaction.query
@@ -141,6 +180,7 @@ def client_detail(id):
 
 
 @app.route('/clients/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_client(id):
     client = Client.query.get_or_404(id)
     if request.method == 'POST':
@@ -157,6 +197,7 @@ def edit_client(id):
 
 
 @app.route('/clients/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_client(id):
     client = Client.query.get_or_404(id)
     name = client.name
@@ -169,6 +210,7 @@ def delete_client(id):
 # ── Routes: Contact Persons ─────────────────────────────────────────────────
 
 @app.route('/clients/<int:client_id>/contacts/new', methods=['GET', 'POST'])
+@login_required
 def new_contact(client_id):
     client = Client.query.get_or_404(client_id)
     if request.method == 'POST':
@@ -187,6 +229,7 @@ def new_contact(client_id):
 
 
 @app.route('/contacts/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_contact(id):
     contact = ContactPerson.query.get_or_404(id)
     if request.method == 'POST':
@@ -201,6 +244,7 @@ def edit_contact(id):
 
 
 @app.route('/contacts/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_contact(id):
     contact = ContactPerson.query.get_or_404(id)
     client_id = contact.client_id
@@ -213,6 +257,7 @@ def delete_contact(id):
 # ── Routes: Reminders ───────────────────────────────────────────────────────
 
 @app.route('/reminders')
+@login_required
 def all_reminders():
     member_filter = request.args.get('member', '').strip()
     pending_q = Reminder.query.filter_by(done=False)
@@ -230,6 +275,7 @@ def all_reminders():
 
 
 @app.route('/clients/<int:client_id>/reminders/new', methods=['GET', 'POST'])
+@login_required
 def new_reminder(client_id):
     client = Client.query.get_or_404(client_id)
     members = TeamMember.query.order_by(TeamMember.name).all()
@@ -254,6 +300,7 @@ def new_reminder(client_id):
 
 
 @app.route('/reminders/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_reminder(id):
     reminder = Reminder.query.get_or_404(id)
     members = TeamMember.query.order_by(TeamMember.name).all()
@@ -273,6 +320,7 @@ def edit_reminder(id):
 
 
 @app.route('/reminders/<int:id>/toggle', methods=['POST'])
+@login_required
 def toggle_reminder(id):
     reminder = Reminder.query.get_or_404(id)
     reminder.done = not reminder.done
@@ -281,6 +329,7 @@ def toggle_reminder(id):
 
 
 @app.route('/reminders/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_reminder(id):
     reminder = Reminder.query.get_or_404(id)
     client_id = reminder.client_id
@@ -293,6 +342,7 @@ def delete_reminder(id):
 # ── Routes: Interactions ────────────────────────────────────────────────────
 
 @app.route('/clients/<int:client_id>/interactions/new', methods=['GET', 'POST'])
+@login_required
 def new_interaction(client_id):
     client = Client.query.get_or_404(client_id)
     members = TeamMember.query.order_by(TeamMember.name).all()
@@ -320,6 +370,7 @@ def new_interaction(client_id):
 
 
 @app.route('/interactions/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_interaction(id):
     interaction = Interaction.query.get_or_404(id)
     members = TeamMember.query.order_by(TeamMember.name).all()
@@ -342,6 +393,7 @@ def edit_interaction(id):
 
 
 @app.route('/interactions/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_interaction(id):
     interaction = Interaction.query.get_or_404(id)
     client_id = interaction.client_id
@@ -354,12 +406,14 @@ def delete_interaction(id):
 # ── Routes: Team Members ────────────────────────────────────────────────────
 
 @app.route('/team')
+@login_required
 def team():
     members = TeamMember.query.order_by(TeamMember.name).all()
     return render_template('team.html', members=members)
 
 
 @app.route('/team/new', methods=['GET', 'POST'])
+@login_required
 def new_member():
     if request.method == 'POST':
         member = TeamMember(
@@ -374,6 +428,7 @@ def new_member():
 
 
 @app.route('/team/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
 def edit_member(id):
     member = TeamMember.query.get_or_404(id)
     if request.method == 'POST':
@@ -386,6 +441,7 @@ def edit_member(id):
 
 
 @app.route('/team/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_member(id):
     member = TeamMember.query.get_or_404(id)
     if member.interactions:
