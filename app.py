@@ -274,11 +274,17 @@ def load_ares(id):
         if statutory_parts:
             client.statutory = '\n'.join(statutory_parts)
 
-        # Velikost firmy
+        # Velikost firmy — nejdříve ARES, pak záložní zdroje
+        size_found = False
         stat = data.get('statistickeUdaje') or {}
         emp_code = str(stat.get('pocetZamestnancuKod', ''))
         if emp_code in EMPLOYEE_CODE_TO_SIZE:
             client.size_category = EMPLOYEE_CODE_TO_SIZE[emp_code]
+            size_found = True
+        if not size_found:
+            scraped_size, _ = _scrape_size(ico, nazev)
+            if scraped_size:
+                client.size_category = scraped_size
 
         # Pobočky / provozovny
         try:
@@ -313,6 +319,67 @@ CAREER_KEYWORDS = [
     'join-us', 'join', 'team', 'tym', 'tým', 'recruit', 'employment',
     'pozice', 'nabidka', 'nabídka',
 ]
+
+
+def _scrape_size(ico, company_name=''):
+    """
+    Pokusí se zjistit velikost firmy z více zdrojů.
+    Vrátí (size_category, zdroj) nebo (None, None).
+    """
+    # 1. kurzy.cz — rejstřík firem
+    try:
+        resp = _fetch(f'https://rejstrik-firem.kurzy.cz/ico/{ico}/')
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            text = soup.get_text(' ')
+            # Hledáme vzor "Počet zaměstnanců: 123" nebo "zaměstnanci 50-249"
+            m = re.search(r'po[čc]et\s+zam[eě]stnanc[ůu][^\d]*(\d[\d\s]*)', text, re.I)
+            if m:
+                count = int(re.sub(r'\s', '', m.group(1)))
+                if count < 10:
+                    return 'micro', 'kurzy.cz'
+                elif count < 50:
+                    return 'small', 'kurzy.cz'
+                elif count < 500:
+                    return 'medium', 'kurzy.cz'
+                else:
+                    return 'large', 'kurzy.cz'
+            # Hledáme rozsahy jako "50 - 249"
+            m = re.search(r'(\d+)\s*[-–]\s*(\d+)\s*zam', text, re.I)
+            if m:
+                avg = (int(m.group(1)) + int(m.group(2))) // 2
+                if avg < 10:
+                    return 'micro', 'kurzy.cz'
+                elif avg < 50:
+                    return 'small', 'kurzy.cz'
+                elif avg < 500:
+                    return 'medium', 'kurzy.cz'
+                else:
+                    return 'large', 'kurzy.cz'
+    except Exception:
+        pass
+
+    # 2. Firmy.cz — hledání podle IČO
+    try:
+        resp = _fetch(f'https://www.firmy.cz/detail/{ico}')
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            text = soup.get_text(' ')
+            m = re.search(r'(\d+)\s*[-–]\s*(\d+)\s*zam', text, re.I)
+            if m:
+                avg = (int(m.group(1)) + int(m.group(2))) // 2
+                if avg < 10:
+                    return 'micro', 'firmy.cz'
+                elif avg < 50:
+                    return 'small', 'firmy.cz'
+                elif avg < 500:
+                    return 'medium', 'firmy.cz'
+                else:
+                    return 'large', 'firmy.cz'
+    except Exception:
+        pass
+
+    return None, None
 
 
 def _get_proxies():
