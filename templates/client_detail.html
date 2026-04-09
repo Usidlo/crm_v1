@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}{{ client.name }} – CRM PROLUS Dynamics{% endblock %}
+{% block title %}{{ client.name }} – CRM Sales PD{% endblock %}
 {% block content %}
 
 <div class="d-flex align-items-start mb-4 gap-3">
@@ -36,6 +36,20 @@
           </form>
         </div>
         {% endif %}
+        {% if client.size_category %}
+        <div class="mb-2">
+          <i class="bi bi-people text-muted me-2"></i>
+          {% set size_colors = {'micro': 'secondary', 'small': 'info', 'medium': 'warning', 'large': 'success'} %}
+          <span class="badge bg-{{ size_colors[client.size_category] }} text-dark">
+            {{ size_labels[client.size_category] }}
+          </span>
+        </div>
+        {% endif %}
+        {% if client.address %}
+        <div class="mb-2">
+          <i class="bi bi-geo-alt text-muted me-2"></i><span class="small">{{ client.address }}</span>
+        </div>
+        {% endif %}
         {% if client.email %}
         <div class="mb-2">
           <i class="bi bi-envelope text-muted me-2"></i>
@@ -53,19 +67,26 @@
           <a href="{{ client.website if client.website.startswith('http') else 'https://' + client.website }}"
              target="_blank" class="text-decoration-none">{{ client.website }}</a>
           <form method="post" action="{{ url_for('load_website', id=client.id) }}" class="d-inline ms-2">
-            <button class="btn btn-outline-secondary btn-sm py-0 px-1" title="Načíst popis webu">
-              <i class="bi bi-cloud-download"></i> Popis
+            <button class="btn btn-outline-secondary btn-sm py-0 px-1" title="Načíst nabídky práce">
+              <i class="bi bi-cloud-download"></i> Práce
             </button>
           </form>
         </div>
         {% endif %}
-        {% if not client.email and not client.phone and not client.ico and not client.website %}
-        <p class="text-muted small mb-0">Žádné kontaktní údaje.</p>
+        {% if client.statutory %}
+        <hr>
+        <h6 class="text-muted text-uppercase small fw-semibold mb-2">Statutáři</h6>
+        <div class="small mb-0" style="white-space:pre-wrap;">{{ client.statutory }}</div>
+        {% endif %}
+        {% if client.branches %}
+        <hr>
+        <h6 class="text-muted text-uppercase small fw-semibold mb-2">Pobočky / provozovny</h6>
+        <div class="small mb-0" style="white-space:pre-wrap;">{{ client.branches }}</div>
         {% endif %}
         {% if client.web_description %}
         <hr>
-        <h6 class="text-muted text-uppercase small fw-semibold mb-2">Popis webu</h6>
-        <p class="small mb-0">{{ client.web_description }}</p>
+        <h6 class="text-muted text-uppercase small fw-semibold mb-2">Nabídky práce</h6>
+        <div class="small mb-0" style="white-space:pre-wrap;">{{ client.web_description }}</div>
         {% endif %}
         {% if client.notes %}
         <hr>

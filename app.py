@@ -4,7 +4,24 @@ from sqlalchemy import text
 from datetime import datetime
 from functools import wraps
 import requests
+import os
+import re
 from bs4 import BeautifulSoup
+
+EMPLOYEE_CODE_TO_SIZE = {
+    '1': 'micro', '2': 'micro', '3': 'micro',
+    '4': 'small', '5': 'small', '6': 'small',
+    '7': 'medium', '8': 'medium', '9': 'medium',
+    '10': 'large', '11': 'large', '12': 'large',
+    '13': 'large', '14': 'large', '15': 'large',
+}
+
+SIZE_LABELS = {
+    'micro': 'Mikro (do 9 zam.)',
+    'small': 'Malá (10–49 zam.)',
+    'medium': 'Střední (50–499 zam.)',
+    'large': 'Velká (500+ zam.)',
+}
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'crm-secret-key-2024'
@@ -48,6 +65,11 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 
+@app.context_processor
+def inject_globals():
+    return dict(size_labels=SIZE_LABELS)
+
+
 # ── Models ─────────────────────────────────────────────────────────────────
 
 class Client(db.Model):
@@ -59,6 +81,10 @@ class Client(db.Model):
     phone = db.Column(db.String(50))
     website = db.Column(db.String(500))
     web_description = db.Column(db.Text)
+    address = db.Column(db.String(500))
+    statutory = db.Column(db.Text)
+    branches = db.Column(db.Text)
+    size_category = db.Column(db.String(20))  # micro, small, medium, large
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     interactions = db.relationship('Interaction', backref='client', lazy=True, cascade='all, delete-orphan')
@@ -137,6 +163,7 @@ def dashboard():
 @login_required
 def clients():
     q = request.args.get('q', '').strip()
+    size = request.args.get('size', '').strip()
     query = Client.query
     if q:
         query = query.filter(
@@ -144,8 +171,11 @@ def clients():
             (Client.company.ilike(f'%{q}%')) |
             (Client.email.ilike(f'%{q}%'))
         )
+    if size:
+        query = query.filter(Client.size_category == size)
     all_clients = query.order_by(Client.name).all()
-    return render_template('clients.html', clients=all_clients, q=q)
+    return render_template('clients.html', clients=all_clients, q=q,
+                           size=size, size_labels=SIZE_LABELS)
 
 
 @app.route('/clients/new', methods=['GET', 'POST'])
@@ -213,33 +243,177 @@ def load_ares(id):
     if not ico:
         flash('Nejdříve zadej IČO a ulož klienta.', 'warning')
         return redirect(url_for('client_detail', id=id))
-    proxies = {
-        'http': 'http://proxy.server:3128',
-        'https': 'http://proxy.server:3128',
-    }
     try:
-        resp = requests.get(
-            f'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}',
-            timeout=10,
-            proxies=proxies,
-        )
+        # Základní údaje
+        resp = _fetch(f'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}')
         if resp.status_code == 404:
             flash('IČO nebylo nalezeno v ARES.', 'danger')
             return redirect(url_for('client_detail', id=id))
         resp.raise_for_status()
         data = resp.json()
+
+        # Název a sídlo
         nazev = data.get('obchodniJmeno', '')
-        adresa = (data.get('sidlo') or {}).get('textovaAdresa', '')
+        sidlo = data.get('sidlo') or {}
+        adresa = sidlo.get('textovaAdresa', '')
         if nazev:
             client.name = nazev
             client.company = nazev
-        if adresa and not client.notes:
-            client.notes = adresa
+        if adresa:
+            client.address = adresa
+
+        # Statutáři
+        statutory_parts = []
+        for rep in data.get('predstavitele', []):
+            jmeno = rep.get('jmeno', '')
+            funkce = rep.get('funkce', {})
+            if isinstance(funkce, dict):
+                funkce = funkce.get('nazev', '')
+            if jmeno:
+                statutory_parts.append(f'{jmeno} ({funkce})' if funkce else jmeno)
+        if statutory_parts:
+            client.statutory = '\n'.join(statutory_parts)
+
+        # Velikost firmy
+        stat = data.get('statistickeUdaje') or {}
+        emp_code = str(stat.get('pocetZamestnancuKod', ''))
+        if emp_code in EMPLOYEE_CODE_TO_SIZE:
+            client.size_category = EMPLOYEE_CODE_TO_SIZE[emp_code]
+
+        # Pobočky / provozovny
+        try:
+            presp = _fetch(
+                f'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}/provozovny'
+            )
+            if presp.status_code == 200:
+                pdata = presp.json()
+                provozovny = pdata.get('provozovny') or pdata if isinstance(pdata, list) else []
+                branch_lines = []
+                for p in provozovny[:20]:
+                    nazev_p = p.get('nazevProvozovny', '')
+                    adresa_p = (p.get('adresa') or {}).get('textovaAdresa', '')
+                    line = nazev_p or adresa_p
+                    if line:
+                        branch_lines.append(line)
+                if branch_lines:
+                    client.branches = '\n'.join(branch_lines)
+        except Exception:
+            pass
+
         db.session.commit()
         flash(f'Údaje z ARES načteny: {nazev}', 'success')
     except Exception as e:
         flash(f'Chyba při načítání z ARES: {e}', 'danger')
     return redirect(url_for('client_detail', id=id))
+
+
+CAREER_KEYWORDS = [
+    'kariera', 'kariéra', 'prace', 'práce', 'volne-pozice', 'volné-pozice',
+    'jobs', 'careers', 'career', 'job', 'hiring', 'work-with-us',
+    'join-us', 'join', 'team', 'tym', 'tým', 'recruit', 'employment',
+    'pozice', 'nabidka', 'nabídka',
+]
+
+
+def _get_proxies():
+    if os.environ.get('PYTHONANYWHERE_SITE'):
+        return {'http': 'http://proxy.server:3128', 'https': 'http://proxy.server:3128'}
+    return {}
+
+
+def _fetch(url, timeout=10):
+    headers = {'User-Agent': 'Mozilla/5.0 (compatible; CRM-bot/1.0)'}
+    return requests.get(url, timeout=timeout, headers=headers, proxies=_get_proxies())
+
+
+# Slova typická pro pracovní pozice
+JOB_ROLE_KEYWORDS = [
+    'specialista', 'specialist', 'manažer', 'manager', 'developer', 'vývojář',
+    'analytik', 'analyst', 'koordinátor', 'coordinator', 'asistent', 'assistant',
+    'vedoucí', 'ředitel', 'director', 'inženýr', 'engineer', 'technik', 'technician',
+    'konzultant', 'consultant', 'obchodní', 'sales', 'marketing', 'accountant',
+    'účetní', 'projektový', 'project', 'senior', 'junior', 'lead', 'architect',
+    'designer', 'tester', 'qa', 'devops', 'hr ', 'recruiter', 'logistik',
+    'skladník', 'řidič', 'operátor', 'mistr', 'konstruktér', 'právník',
+    'lawyer', 'finance', 'finanční', 'it ', 'správce', 'administrátor',
+    'administrator', 'support', 'podpora', 'scrum', 'product owner',
+]
+
+
+def _looks_like_job(text):
+    """Vrátí True pokud text vypadá jako název pracovní pozice."""
+    t = text.lower()
+    return any(kw in t for kw in JOB_ROLE_KEYWORDS)
+
+
+def _find_career_url(soup, base_url):
+    """Najde odkaz na kariérní stránku — včetně externích kariérních domén."""
+    from urllib.parse import urljoin, urlparse
+    base_host = urlparse(base_url).netloc.replace('www.', '')
+
+    candidates = []
+    for a in soup.find_all('a', href=True):
+        href = a['href']
+        text = a.get_text(strip=True).lower()
+        href_lower = href.lower()
+
+        if any(kw in href_lower or kw in text for kw in CAREER_KEYWORDS):
+            full = urljoin(base_url, href)
+            parsed = urlparse(full)
+            if not parsed.scheme.startswith('http'):
+                continue
+            link_host = parsed.netloc.replace('www.', '')
+            # Stejná doména nebo kariérní subdoména/doména související s firmou
+            same_domain = link_host == base_host
+            career_domain = any(kw in link_host for kw in ['kariera', 'career', 'jobs', 'prace'])
+            if same_domain or career_domain:
+                candidates.append((0 if same_domain else 1, full))
+
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: x[0])
+    return candidates[0][1]
+
+
+def _extract_jobs(soup):
+    """Extrahuje seznam pracovních pozic ze stránky."""
+    jobs = []
+
+    # 1. Schema.org JobPosting — nejspolehlivější
+    for el in soup.find_all(attrs={'itemtype': re.compile(r'JobPosting', re.I)}):
+        title = el.find(attrs={'itemprop': 'title'})
+        if title:
+            jobs.append(title.get_text(strip=True))
+    if jobs:
+        return jobs
+
+    # 2. Elementy s třídou obsahující "job" nebo "position"
+    for el in soup.find_all(class_=re.compile(r'job|position|vacancy|pozic|role', re.I)):
+        for tag in ['h2', 'h3', 'h4', 'a']:
+            heading = el.find(tag)
+            if heading:
+                text = heading.get_text(strip=True)
+                if 5 < len(text) < 120 and _looks_like_job(text):
+                    jobs.append(text)
+    if jobs:
+        return list(dict.fromkeys(jobs))[:25]
+
+    # 3. Nadpisy které vypadají jako pracovní pozice
+    for tag in ['h2', 'h3', 'h4']:
+        for heading in soup.find_all(tag):
+            text = heading.get_text(strip=True)
+            if 5 < len(text) < 120 and _looks_like_job(text):
+                jobs.append(text)
+    if jobs:
+        return list(dict.fromkeys(jobs))[:25]
+
+    # 4. Odkazy které vypadají jako pracovní pozice
+    for a in soup.find_all('a', href=True):
+        text = a.get_text(strip=True)
+        if 5 < len(text) < 120 and _looks_like_job(text):
+            jobs.append(text)
+
+    return list(dict.fromkeys(jobs))[:25]
 
 
 @app.route('/clients/<int:id>/load-website', methods=['POST'])
@@ -252,26 +426,56 @@ def load_website(id):
         return redirect(url_for('client_detail', id=id))
     if not url.startswith('http'):
         url = 'https://' + url
-    proxies = {
-        'http': 'http://proxy.server:3128',
-        'https': 'http://proxy.server:3128',
-    }
     try:
-        resp = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'}, proxies=proxies)
+        # 1. Načti hlavní stránku
+        resp = _fetch(url)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, 'html.parser')
-        description = ''
-        meta = soup.find('meta', attrs={'name': 'description'}) or \
-               soup.find('meta', attrs={'property': 'og:description'})
-        if meta and meta.get('content'):
-            description = meta['content'].strip()
-        if not description:
-            title = soup.title.string.strip() if soup.title else ''
-            paras = [p.get_text(' ', strip=True) for p in soup.find_all('p') if len(p.get_text()) > 60]
-            description = title + ('\n' + paras[0] if paras else '')
-        client.web_description = description[:1000]
+
+        # 2. Stručný popis firmy z meta tagů
+        meta = (soup.find('meta', attrs={'name': 'description'}) or
+                soup.find('meta', attrs={'property': 'og:description'}))
+        company_desc = meta['content'].strip() if meta and meta.get('content') else ''
+        if not company_desc and soup.title:
+            company_desc = soup.title.string.strip()
+
+        # 3. Najdi kariérní stránku
+        career_url = _find_career_url(soup, url)
+        jobs = []
+        career_info = ''
+
+        if career_url:
+            try:
+                cresp = _fetch(career_url)
+                cresp.raise_for_status()
+                csoup = BeautifulSoup(cresp.text, 'html.parser')
+                jobs = _extract_jobs(csoup)
+                career_info = f'\n\nKariérní stránka: {career_url}'
+            except Exception:
+                pass
+
+        # 4. Sestav výsledný popis
+        parts = []
+        if company_desc:
+            parts.append(company_desc)
+        if jobs:
+            parts.append('\n--- Aktuální nabídky práce ---')
+            for j in jobs:
+                parts.append(f'• {j}')
+        elif career_url:
+            parts.append('\n--- Kariérní stránka nalezena, ale žádné pozice nebyly rozpoznány ---')
+            parts.append(career_info)
+        else:
+            parts.append('\n--- Kariérní stránka nebyla nalezena ---')
+
+        client.web_description = '\n'.join(parts)[:2000]
         db.session.commit()
-        flash('Popis webu byl načten.', 'success')
+
+        if jobs:
+            flash(f'Načteno {len(jobs)} nabídek práce.', 'success')
+        else:
+            flash('Web načten, nabídky práce nebyly nalezeny.', 'warning')
+
     except Exception as e:
         flash(f'Chyba při načítání webu: {e}', 'danger')
     return redirect(url_for('client_detail', id=id))
@@ -545,6 +749,10 @@ with app.app_context():
             'ALTER TABLE client ADD COLUMN ico VARCHAR(20)',
             'ALTER TABLE client ADD COLUMN website VARCHAR(500)',
             'ALTER TABLE client ADD COLUMN web_description TEXT',
+            'ALTER TABLE client ADD COLUMN address VARCHAR(500)',
+            'ALTER TABLE client ADD COLUMN statutory TEXT',
+            'ALTER TABLE client ADD COLUMN branches TEXT',
+            'ALTER TABLE client ADD COLUMN size_category VARCHAR(20)',
         ]:
             try:
                 conn.execute(text(sql))
