@@ -213,10 +213,15 @@ def load_ares(id):
     if not ico:
         flash('Nejdříve zadej IČO a ulož klienta.', 'warning')
         return redirect(url_for('client_detail', id=id))
+    proxies = {
+        'http': 'http://proxy.server:3128',
+        'https': 'http://proxy.server:3128',
+    }
     try:
         resp = requests.get(
             f'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}',
-            timeout=10
+            timeout=10,
+            proxies=proxies,
         )
         if resp.status_code == 404:
             flash('IČO nebylo nalezeno v ARES.', 'danger')
@@ -247,8 +252,12 @@ def load_website(id):
         return redirect(url_for('client_detail', id=id))
     if not url.startswith('http'):
         url = 'https://' + url
+    proxies = {
+        'http': 'http://proxy.server:3128',
+        'https': 'http://proxy.server:3128',
+    }
     try:
-        resp = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+        resp = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'}, proxies=proxies)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, 'html.parser')
         description = ''
