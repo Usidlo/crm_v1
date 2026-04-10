@@ -292,14 +292,15 @@ def load_ares(id):
         elif scraped_size:
             client.size_category = scraped_size
 
-        # Pobočky / provozovny — ARES RŽP (funguje pro živnostníky a s.r.o.)
+        # Pobočky — 1) ARES RŽP provozovny, 2) web firmy
+        branches_found = False
         try:
             presp = _fetch(
                 f'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}/provozovny'
             )
             if presp.status_code == 200:
                 pdata = presp.json()
-                provozovny = pdata.get('provozovny') or pdata if isinstance(pdata, list) else []
+                provozovny = pdata.get('provozovny') or (pdata if isinstance(pdata, list) else [])
                 branch_lines = []
                 for p in provozovny[:20]:
                     nazev_p = p.get('nazevProvozovny', '')
@@ -309,8 +310,14 @@ def load_ares(id):
                         branch_lines.append(line)
                 if branch_lines:
                     client.branches = '\n'.join(branch_lines)
+                    branches_found = True
         except Exception:
             pass
+
+        if not branches_found and client.website:
+            scraped_branches = _scrape_branches(client.website)
+            if scraped_branches:
+                client.branches = scraped_branches
 
         db.session.commit()
         flash(f'Údaje z ARES načteny: {nazev}', 'success')
@@ -325,6 +332,77 @@ CAREER_KEYWORDS = [
     'join-us', 'join', 'team', 'tym', 'tým', 'recruit', 'employment',
     'pozice', 'nabidka', 'nabídka',
 ]
+
+
+BRANCH_KEYWORDS = [
+    'pobocky', 'pobočky', 'prodejny', 'provozovny', 'kde-nas-najdete',
+    'kde-nas-najdou', 'kontakty', 'contacts', 'locations', 'offices',
+    'nase-pobocky', 'nase-prodejny', 'kde-jsme', 'kamenné-prodejny',
+]
+
+
+def _scrape_branches(website_url):
+    """
+    Načte pobočky/provozovny z webu firmy.
+    Hledá stránku s pobočkami a extrahuje adresy.
+    """
+    from urllib.parse import urljoin, urlparse
+    if not website_url.startswith('http'):
+        website_url = 'https://' + website_url
+    try:
+        resp = _fetch(website_url)
+        if resp.status_code != 200:
+            return None
+        soup = BeautifulSoup(resp.content, 'html.parser')
+
+        # Hledej odkaz na stránku s pobočkami
+        branch_url = None
+        for a in soup.find_all('a', href=True):
+            href = a['href'].lower()
+            text = a.get_text(strip=True).lower()
+            if any(kw in href or kw in text for kw in BRANCH_KEYWORDS):
+                full = urljoin(website_url, a['href'])
+                if urlparse(full).netloc == urlparse(website_url).netloc:
+                    branch_url = full
+                    break
+
+        target_url = branch_url or website_url
+        if branch_url:
+            resp = _fetch(branch_url)
+            if resp.status_code != 200:
+                return None
+            soup = BeautifulSoup(resp.content, 'html.parser')
+
+        # Extrahuj adresy — hledej PSČ vzor (123 45 nebo 12345)
+        text = soup.get_text(' ', strip=True)
+        psc_pattern = re.compile(r'[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][^.!?\n]{5,80}\d{3}\s?\d{2}[^.!?\n]{0,30}', re.I)
+        addresses = []
+        for m in psc_pattern.finditer(text):
+            addr = m.group(0).strip()
+            # Odfiltruj duplikáty a příliš dlouhé
+            if addr not in addresses and len(addr) < 120:
+                addresses.append(addr)
+            if len(addresses) >= 15:
+                break
+
+        if addresses:
+            prefix = f'(zdroj: {target_url})\n' if branch_url else ''
+            return prefix + '\n'.join(addresses)
+
+        # Fallback — nadpisy na kontaktní stránce jako názvy poboček
+        if branch_url:
+            headings = []
+            for tag in ['h2', 'h3']:
+                for h in soup.find_all(tag):
+                    t = h.get_text(strip=True)
+                    if 5 < len(t) < 80:
+                        headings.append(t)
+            if headings:
+                return f'(zdroj: {branch_url})\n' + '\n'.join(headings[:15])
+
+        return None
+    except Exception:
+        return None
 
 
 STATUTORY_ROLES = [
