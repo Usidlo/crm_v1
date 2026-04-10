@@ -633,86 +633,217 @@ def _find_page_link(soup, base_url, keywords):
     return None
 
 
-def _find_hr_contacts(website_url):
-    """
-    Hledá HR kontakty na webu firmy.
-    Vrátí seznam dict: [{name, role, email}]
-    """
+NAME_RE = re.compile(
+    r'[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]{1,20}'
+    r'\s+'
+    r'[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]{1,25}(?:ová|ová)?'
+)
+EMAIL_RE = re.compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}')
+
+HR_CONTEXT_WORDS = HR_ROLE_KEYWORDS + [
+    'hr', 'personál', 'nábor', 'recruiter', 'personalista', 'personalní',
+    'people', 'kariéra', 'kariera', 'talent', 'zaměstnanci',
+]
+
+# Kandidátní URL cesty pro HR/kontaktní stránky
+HR_URL_PATHS = [
+    '/kariera', '/kariéra', '/kariera/kontakt', '/jobs/contact', '/jobs/kontakt',
+    '/kontakty', '/kontakt', '/contact', '/contact-us',
+    '/tym', '/tým', '/team', '/o-nas/tym', '/about/team',
+    '/lide', '/lidé', '/people', '/nase-lide',
+    '/hr', '/human-resources',
+]
+
+
+def _collect_pages(website_url):
+    """Sbírá URL stránek k prohledání — web, sitemap, časté cesty."""
     from urllib.parse import urlparse, urljoin
-    if not website_url.startswith('http'):
-        website_url = 'https://' + website_url
-
-    domain = urlparse(website_url).netloc.replace('www.', '')
-    found = {}   # email -> dict
-
-    # Stránky k prohledání
+    base = f"{urlparse(website_url).scheme}://{urlparse(website_url).netloc}"
     pages = [website_url]
+    seen = {website_url}
+
+    # 1. Hlavní stránka → najdi kariérní + kontaktní stránku
     try:
         resp = _fetch(website_url)
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.content, 'html.parser')
-            career = _find_career_url(soup, website_url)
-            if career:
-                pages.append(career)
-            contact = _find_page_link(soup, website_url,
-                                      ['kontakt', 'contact', 'tym', 'tým', 'team', 'lide', 'lidé'])
-            if contact and contact not in pages:
-                pages.append(contact)
+            for kw_list, label in [
+                (['kontakt', 'contact', 'tym', 'tým', 'team', 'lide', 'lidé', 'people'], 'contact'),
+                (CAREER_KEYWORDS, 'career'),
+            ]:
+                url = _find_page_link(soup, website_url, kw_list)
+                if url and url not in seen:
+                    pages.append(url)
+                    seen.add(url)
     except Exception:
         pass
 
-    email_re = re.compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}')
+    # 2. Zkus časté HR cesty
+    for path in HR_URL_PATHS:
+        url = base + path
+        if url not in seen:
+            pages.append(url)
+            seen.add(url)
 
-    for page_url in pages[:4]:
+    # 3. Sitemap.xml → hledej HR/kariérní/kontaktní stránky
+    try:
+        smap = _fetch(base + '/sitemap.xml')
+        if smap.status_code == 200:
+            for loc in re.findall(r'<loc>(.*?)</loc>', smap.text):
+                loc_lower = loc.lower()
+                if any(kw in loc_lower for kw in
+                       ['kariera', 'career', 'job', 'kontakt', 'contact', 'team', 'tym', 'hr', 'lide']):
+                    if loc not in seen:
+                        pages.append(loc)
+                        seen.add(loc)
+                        if len(pages) > 15:
+                            break
+    except Exception:
+        pass
+
+    return pages[:15]
+
+
+def _extract_contacts_from_page(soup, text, domain):
+    """Z jedné stránky vytáhne HR kontakty — email + jméno + role."""
+    found = {}
+
+    # 1. Schema.org Person markup
+    for person in soup.find_all(attrs={'itemtype': re.compile(r'Person', re.I)}):
+        name_el = person.find(attrs={'itemprop': 'name'})
+        email_el = person.find(attrs={'itemprop': 'email'})
+        role_el = person.find(attrs={'itemprop': 'jobTitle'})
+        name = name_el.get_text(strip=True) if name_el else ''
+        email = email_el.get_text(strip=True).replace('mailto:', '') if email_el else ''
+        role = role_el.get_text(strip=True) if role_el else ''
+        if email and any(kw in (name + role).lower() for kw in HR_CONTEXT_WORDS):
+            found[email] = {'name': name or 'HR kontakt', 'role': role or 'HR', 'email': email}
+
+    # 2. Emaily v textu + kontext
+    for email in EMAIL_RE.findall(text):
+        if email in found:
+            continue
+        local = email.lower().split('@')[0]
+        is_hr_email = any(local == p or local.startswith(p) for p in HR_EMAIL_PREFIXES)
+
+        idx = text.lower().find(email.lower())
+        context = text[max(0, idx - 300): idx + 150]
+        is_hr_context = any(kw in context.lower() for kw in HR_CONTEXT_WORDS)
+
+        if is_hr_email or is_hr_context:
+            role = _extract_hr_role(context)
+            name_match = NAME_RE.search(context)
+            name = name_match.group(0) if name_match else 'HR kontakt'
+            found[email] = {'name': name, 'role': role, 'email': email}
+
+    # 3. LinkedIn profily na stránce → vytáhni jméno z URL
+    for a in soup.find_all('a', href=True):
+        href = a['href']
+        if 'linkedin.com/in/' in href:
+            slug = href.rstrip('/').split('linkedin.com/in/')[-1].split('?')[0]
+            # slug → jméno: "jana-novakova" → "Jana Novakova"
+            li_name = ' '.join(p.capitalize() for p in slug.replace('-', ' ').split())
+            li_text = a.get_text(strip=True) or li_name
+            context = a.parent.get_text(' ', strip=True) if a.parent else li_text
+            if any(kw in context.lower() for kw in HR_CONTEXT_WORDS):
+                key = f'linkedin:{slug}'
+                if key not in found:
+                    found[key] = {
+                        'name': li_text if len(li_text) < 60 else li_name,
+                        'role': _extract_hr_role(context),
+                        'email': '',
+                        'linkedin': href,
+                    }
+
+    return found
+
+
+def _search_bing_hr(company_name, domain):
+    """Hledá HR kontakty přes Bing."""
+    found = {}
+    queries = [
+        f'"{company_name}" personalista OR recruiter OR "HR manager" email',
+        f'site:{domain} HR OR personalista OR kariéra kontakt email',
+    ]
+    for q in queries:
+        try:
+            resp = _fetch(
+                f'https://www.bing.com/search?q={requests.utils.quote(q)}&count=10',
+            )
+            if resp.status_code != 200:
+                continue
+            soup = BeautifulSoup(resp.content, 'html.parser')
+            text = soup.get_text(' ', strip=True)
+            for email in EMAIL_RE.findall(text):
+                if email in found:
+                    continue
+                local = email.lower().split('@')[0]
+                if any(local.startswith(p) for p in HR_EMAIL_PREFIXES) or domain in email.lower():
+                    idx = text.lower().find(email.lower())
+                    ctx = text[max(0, idx - 200): idx + 100]
+                    name_match = NAME_RE.search(ctx)
+                    found[email] = {
+                        'name': name_match.group(0) if name_match else 'HR kontakt',
+                        'role': _extract_hr_role(ctx),
+                        'email': email,
+                    }
+            if len(found) >= 3:
+                break
+        except Exception:
+            continue
+    return found
+
+
+def _find_hr_contacts(website_url, company_name=''):
+    """
+    Hledá HR kontakty z více zdrojů:
+    1. Web firmy (hlavní stránka, kariéra, kontakty, tým, sitemap)
+    2. Schema.org Person markup
+    3. LinkedIn profily na webu
+    4. Bing vyhledávání
+    5. Generické emaily jako záloha
+    """
+    from urllib.parse import urlparse
+    if not website_url.startswith('http'):
+        website_url = 'https://' + website_url
+
+    domain = urlparse(website_url).netloc.replace('www.', '')
+    found = {}
+
+    # Fáze 1: web firmy
+    pages = _collect_pages(website_url)
+    for page_url in pages:
         try:
             resp = _fetch(page_url)
             if resp.status_code != 200:
                 continue
             soup = BeautifulSoup(resp.content, 'html.parser')
             text = soup.get_text(' ', strip=True)
-
-            for email in email_re.findall(text):
-                if email in found:
-                    continue
-                email_lower = email.lower()
-                local = email_lower.split('@')[0]
-
-                # HR email podle prefixu?
-                is_hr_email = any(local == p or local.startswith(p) for p in HR_EMAIL_PREFIXES)
-
-                # Email v blízkosti HR klíčového slova?
-                idx = text.lower().find(email.lower())
-                context = text[max(0, idx - 250): idx + 100]
-                is_hr_context = any(kw in context.lower() for kw in
-                                    HR_ROLE_KEYWORDS + ['hr', 'personál', 'nábor', 'recruiter'])
-
-                if is_hr_email or is_hr_context:
-                    role = _extract_hr_role(context)
-                    # Pokus o jméno — hledáme dvě velká slova před nebo za emailem
-                    name_match = re.search(
-                        r'([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+\s+[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)',
-                        context
-                    )
-                    name = name_match.group(1) if name_match else 'HR kontakt'
-                    found[email] = {'name': name, 'role': role, 'email': email}
-
-            if len(found) >= 5:
+            page_found = _extract_contacts_from_page(soup, text, domain)
+            found.update(page_found)
+            if len(found) >= 8:
                 break
         except Exception:
             continue
 
-    # Žádný HR email nenalezen → přidej generický kontakt podle domény
+    # Fáze 2: Bing (pokud málo výsledků)
+    if len(found) < 3 and company_name:
+        bing_found = _search_bing_hr(company_name, domain)
+        found.update(bing_found)
+
+    # Fáze 3: generické emaily jako záloha
     if not found:
-        for prefix in HR_EMAIL_PREFIXES[:4]:
-            generic = f'{prefix}@{domain}'
-            found[generic] = {
+        for prefix in ['hr', 'kariera', 'jobs', 'recruiting']:
+            found[f'{prefix}@{domain}'] = {
                 'name': 'HR oddělení',
                 'role': 'HR (obecný kontakt)',
-                'email': generic,
+                'email': f'{prefix}@{domain}',
             }
             break
 
-    return list(found.values())[:5]
+    # Seřaď — napřed kontakty s emailem
+    result = sorted(found.values(), key=lambda x: (not x.get('email'), x['name']))
+    return result[:10]
 
 
 def _find_career_url(soup, base_url):
@@ -924,7 +1055,7 @@ def find_hr(id):
         return redirect(url_for('client_detail', id=id))
 
     try:
-        hr_contacts = _find_hr_contacts(url)
+        hr_contacts = _find_hr_contacts(url, client.company or client.name)
         added = 0
         for c in hr_contacts:
             # Nepřidávej duplicity (stejný email)
