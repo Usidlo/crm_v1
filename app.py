@@ -594,6 +594,127 @@ def _looks_like_job(text):
     return any(kw in t for kw in JOB_ROLE_KEYWORDS)
 
 
+HR_EMAIL_PREFIXES = [
+    'hr', 'kariera', 'kariéra', 'jobs', 'job', 'recruiting', 'recruitment',
+    'talent', 'prace', 'práce', 'nabor', 'nábor', 'personalni', 'personální',
+    'people', 'humanresources', 'lidi', 'zamestnani', 'zaměstnání',
+]
+
+HR_ROLE_KEYWORDS = [
+    'hr manažer', 'hr manager', 'hr ředitel', 'hr director',
+    'personalista', 'personalistka', 'recruiter', 'recruiterka',
+    'talent acquisition', 'nábor', 'nabor', 'human resources',
+    'personální ředitel', 'people partner', 'hr business partner',
+    'hr bp', 'hr koordinátor', 'hr specialist',
+]
+
+
+def _extract_hr_role(context):
+    """Pokusí se z kontextu extrahovat HR roli."""
+    c = context.lower()
+    for role in HR_ROLE_KEYWORDS:
+        if role in c:
+            return role.title()
+    if 'hr' in c:
+        return 'HR'
+    return 'HR kontakt'
+
+
+def _find_page_link(soup, base_url, keywords):
+    """Obecně najde odkaz na stránku podle klíčových slov."""
+    from urllib.parse import urljoin, urlparse
+    for a in soup.find_all('a', href=True):
+        href = a['href'].lower()
+        txt = a.get_text(strip=True).lower()
+        if any(kw in href or kw in txt for kw in keywords):
+            full = urljoin(base_url, a['href'])
+            if urlparse(full).netloc == urlparse(base_url).netloc:
+                return full
+    return None
+
+
+def _find_hr_contacts(website_url):
+    """
+    Hledá HR kontakty na webu firmy.
+    Vrátí seznam dict: [{name, role, email}]
+    """
+    from urllib.parse import urlparse, urljoin
+    if not website_url.startswith('http'):
+        website_url = 'https://' + website_url
+
+    domain = urlparse(website_url).netloc.replace('www.', '')
+    found = {}   # email -> dict
+
+    # Stránky k prohledání
+    pages = [website_url]
+    try:
+        resp = _fetch(website_url)
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.content, 'html.parser')
+            career = _find_career_url(soup, website_url)
+            if career:
+                pages.append(career)
+            contact = _find_page_link(soup, website_url,
+                                      ['kontakt', 'contact', 'tym', 'tým', 'team', 'lide', 'lidé'])
+            if contact and contact not in pages:
+                pages.append(contact)
+    except Exception:
+        pass
+
+    email_re = re.compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}')
+
+    for page_url in pages[:4]:
+        try:
+            resp = _fetch(page_url)
+            if resp.status_code != 200:
+                continue
+            soup = BeautifulSoup(resp.content, 'html.parser')
+            text = soup.get_text(' ', strip=True)
+
+            for email in email_re.findall(text):
+                if email in found:
+                    continue
+                email_lower = email.lower()
+                local = email_lower.split('@')[0]
+
+                # HR email podle prefixu?
+                is_hr_email = any(local == p or local.startswith(p) for p in HR_EMAIL_PREFIXES)
+
+                # Email v blízkosti HR klíčového slova?
+                idx = text.lower().find(email.lower())
+                context = text[max(0, idx - 250): idx + 100]
+                is_hr_context = any(kw in context.lower() for kw in
+                                    HR_ROLE_KEYWORDS + ['hr', 'personál', 'nábor', 'recruiter'])
+
+                if is_hr_email or is_hr_context:
+                    role = _extract_hr_role(context)
+                    # Pokus o jméno — hledáme dvě velká slova před nebo za emailem
+                    name_match = re.search(
+                        r'([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+\s+[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)',
+                        context
+                    )
+                    name = name_match.group(1) if name_match else 'HR kontakt'
+                    found[email] = {'name': name, 'role': role, 'email': email}
+
+            if len(found) >= 5:
+                break
+        except Exception:
+            continue
+
+    # Žádný HR email nenalezen → přidej generický kontakt podle domény
+    if not found:
+        for prefix in HR_EMAIL_PREFIXES[:4]:
+            generic = f'{prefix}@{domain}'
+            found[generic] = {
+                'name': 'HR oddělení',
+                'role': 'HR (obecný kontakt)',
+                'email': generic,
+            }
+            break
+
+    return list(found.values())[:5]
+
+
 def _find_career_url(soup, base_url):
     """Najde odkaz na kariérní stránku — včetně externích kariérních domén."""
     from urllib.parse import urljoin, urlparse
@@ -789,6 +910,81 @@ def delete_contact(id):
     db.session.commit()
     flash('Kontaktní osoba byla smazána.', 'warning')
     return redirect(url_for('client_detail', id=client_id))
+
+
+# ── Routes: HR hledání + Export ─────────────────────────────────────────────
+
+@app.route('/clients/<int:id>/find-hr', methods=['POST'])
+@login_required
+def find_hr(id):
+    client = Client.query.get_or_404(id)
+    url = client.website.strip() if client.website else ''
+    if not url:
+        flash('Klient nemá vyplněný web — nelze hledat HR kontakty.', 'warning')
+        return redirect(url_for('client_detail', id=id))
+
+    try:
+        hr_contacts = _find_hr_contacts(url)
+        added = 0
+        for c in hr_contacts:
+            # Nepřidávej duplicity (stejný email)
+            if c['email']:
+                exists = ContactPerson.query.filter_by(
+                    client_id=id, email=c['email']
+                ).first()
+                if exists:
+                    continue
+            contact = ContactPerson(
+                client_id=id,
+                name=c['name'],
+                role=c['role'],
+                email=c['email'],
+            )
+            db.session.add(contact)
+            added += 1
+        db.session.commit()
+        if added:
+            flash(f'Nalezeno a přidáno {added} HR kontaktů.', 'success')
+        else:
+            flash('HR kontakty již byly přidány nebo nebyly nalezeny.', 'warning')
+    except Exception as e:
+        flash(f'Chyba při hledání HR kontaktů: {e}', 'danger')
+    return redirect(url_for('client_detail', id=id))
+
+
+@app.route('/export/contacts')
+@login_required
+def export_contacts():
+    import csv
+    from io import StringIO
+    from flask import Response
+
+    client_id = request.args.get('client_id', type=int)
+    query = ContactPerson.query.join(Client).order_by(Client.name, ContactPerson.name)
+    if client_id:
+        query = query.filter(ContactPerson.client_id == client_id)
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Jméno', 'Email', 'Telefon', 'Pozice', 'Firma', 'IČO', 'Web firmy', 'Sídlo'])
+    for c in query.all():
+        writer.writerow([
+            c.name,
+            c.email or '',
+            c.phone or '',
+            c.role or '',
+            c.client.company or c.client.name,
+            c.client.ico or '',
+            c.client.website or '',
+            c.client.address or '',
+        ])
+
+    filename = f'kontakty_klient{client_id}.csv' if client_id else 'kontakty_vsichni.csv'
+    return Response(
+        '\ufeff' + output.getvalue(),   # BOM pro správné zobrazení v Excelu
+        mimetype='text/csv; charset=utf-8',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )
 
 
 # ── Routes: Reminders ───────────────────────────────────────────────────────

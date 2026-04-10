@@ -150,9 +150,21 @@
           <i class="bi bi-person-lines-fill me-2 text-muted"></i>Kontaktní osoby
           <span class="badge bg-light text-dark border ms-1">{{ client.contacts | length }}</span>
         </span>
-        <a href="{{ url_for('new_contact', client_id=client.id) }}" class="btn btn-sm btn-outline-primary">
-          <i class="bi bi-plus-lg me-1"></i>Přidat osobu
-        </a>
+        <div class="d-flex gap-2">
+          {% if client.website %}
+          <form method="post" action="{{ url_for('find_hr', id=client.id) }}">
+            <button class="btn btn-sm btn-outline-success" title="Automaticky najít HR kontakty z webu firmy">
+              <i class="bi bi-search-heart me-1"></i>Najít HR
+            </button>
+          </form>
+          {% endif %}
+          <a href="{{ url_for('new_contact', client_id=client.id) }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-plus-lg me-1"></i>Přidat osobu
+          </a>
+          <a href="{{ url_for('export_contacts', client_id=client.id) }}" class="btn btn-sm btn-outline-secondary" title="Exportovat kontakty do CSV">
+            <i class="bi bi-download me-1"></i>CSV
+          </a>
+        </div>
       </div>
       <div class="card-body p-0">
         {% if client.contacts %}
