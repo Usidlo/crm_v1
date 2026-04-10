@@ -6,7 +6,14 @@
       "Bash(ngrok --version)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(curl -s \"https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/00177041\")",
+      "Bash(curl -s \"https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/00177041/provozovny\")",
+      "Bash(curl -s -A \"Mozilla/5.0\" \"https://rejstrik-firem.kurzy.cz/ico/00177041/\")",
+      "Bash(curl -s -A \"Mozilla/5.0\" -L \"https://rejstrik-firem.kurzy.cz/00177041/\")",
+      "Bash(curl -s \"https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/27082440/provozovny\")",
+      "Bash(curl -s -A \"Mozilla/5.0\" -L \"https://rejstrik-firem.kurzy.cz/27082440/\")",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/__TRACKED_VAR__/__TRACKED_VAR__)"
     ]
   }
 }

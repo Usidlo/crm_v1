@@ -41,8 +41,7 @@
         </tr>
       </thead>
       <tbody>
-        {% set size_colors = {'micro': 'secondary', 'small': 'info', 'medium': 'warning', 'large': 'success'} %}
-        {% for c in clients %}
+                {% for c in clients %}
         <tr>
           <td>
             <a href="{{ url_for('client_detail', id=c.id) }}" class="text-decoration-none fw-semibold">
@@ -52,7 +51,7 @@
           </td>
           <td>
             {% if c.size_category %}
-            <span class="badge bg-{{ size_colors[c.size_category] }} text-dark">
+            <span class="badge bg-{{ size_colors.get(c.size_category, 'secondary') }} text-dark">
               {{ size_labels[c.size_category] }}
             </span>
             {% else %}—{% endif %}

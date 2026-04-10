@@ -43,6 +43,17 @@
                  value="{{ client.website if client and client.website else '' }}">
         </div>
       </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Velikost firmy</label>
+        <select name="size_category" class="form-select">
+          <option value="">— neznámá —</option>
+          {% for key, label in size_labels.items() %}
+          <option value="{{ key }}" {% if client and client.size_category == key %}selected{% endif %}>
+            {{ label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
       <div class="mb-4">
         <label class="form-label fw-semibold">Poznámky</label>
         <textarea name="notes" class="form-control" rows="3">{{ client.notes if client else '' }}</textarea>

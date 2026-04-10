@@ -9,18 +9,30 @@ import re
 from bs4 import BeautifulSoup
 
 EMPLOYEE_CODE_TO_SIZE = {
-    '1': 'micro', '2': 'micro', '3': 'micro',
+    '1': 'freelancer',
+    '2': 'micro', '3': 'micro',
     '4': 'small', '5': 'small', '6': 'small',
-    '7': 'medium', '8': 'medium', '9': 'medium',
-    '10': 'large', '11': 'large', '12': 'large',
-    '13': 'large', '14': 'large', '15': 'large',
+    '7': 'medium', '8': 'medium',
+    '9': 'large', '10': 'large', '11': 'large',
+    '12': 'enterprise', '13': 'enterprise', '14': 'enterprise', '15': 'enterprise',
 }
 
 SIZE_LABELS = {
-    'micro': 'Mikro (do 9 zam.)',
-    'small': 'Malá (10–49 zam.)',
-    'medium': 'Střední (50–499 zam.)',
-    'large': 'Velká (500+ zam.)',
+    'freelancer': 'Freelancer (1 os.)',
+    'micro':      'Mikro (2–9 zam.)',
+    'small':      'Malá (10–49 zam.)',
+    'medium':     'Střední (50–249 zam.)',
+    'large':      'Velká (250–999 zam.)',
+    'enterprise': 'Korporace (1 000+ zam.)',
+}
+
+SIZE_COLORS = {
+    'freelancer': 'secondary',
+    'micro':      'light',
+    'small':      'info',
+    'medium':     'warning',
+    'large':      'success',
+    'enterprise': 'primary',
 }
 
 app = Flask(__name__)
@@ -67,7 +79,7 @@ db = SQLAlchemy(app)
 
 @app.context_processor
 def inject_globals():
-    return dict(size_labels=SIZE_LABELS)
+    return dict(size_labels=SIZE_LABELS, size_colors=SIZE_COLORS)
 
 
 # ── Models ─────────────────────────────────────────────────────────────────
@@ -229,6 +241,11 @@ def edit_client(id):
         client.phone = request.form.get('phone', '').strip()
         client.website = request.form.get('website', '').strip()
         client.notes = request.form.get('notes', '').strip()
+        size_val = request.form.get('size_category', '').strip()
+        if size_val in SIZE_LABELS:
+            client.size_category = size_val
+        elif size_val == '':
+            client.size_category = None
         db.session.commit()
         flash('Klient byl upraven.', 'success')
         return redirect(url_for('client_detail', id=client.id))
@@ -466,14 +483,18 @@ def _scrape_statutory_and_size(ico):
         m = re.search(r'po[čc]et\s+zam[eě]stnanc[ůu][^\d]*(\d[\d\s]*)', text, re.I)
         if m:
             count = int(re.sub(r'\s', '', m.group(1)))
-            if count < 10:
+            if count <= 1:
+                size = 'freelancer'
+            elif count < 10:
                 size = 'micro'
             elif count < 50:
                 size = 'small'
-            elif count < 500:
+            elif count < 250:
                 size = 'medium'
-            else:
+            elif count < 1000:
                 size = 'large'
+            else:
+                size = 'enterprise'
 
         return statutory_text, size
 
@@ -654,54 +675,58 @@ def load_website(id):
     if not url.startswith('http'):
         url = 'https://' + url
     try:
-        # 1. Načti hlavní stránku
         resp = _fetch(url)
         resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, 'html.parser')
+        soup = BeautifulSoup(resp.content, 'html.parser')
 
-        # 2. Stručný popis firmy z meta tagů
+        parts = []
+
+        # 1. Popis z meta tagů
         meta = (soup.find('meta', attrs={'name': 'description'}) or
                 soup.find('meta', attrs={'property': 'og:description'}))
-        company_desc = meta['content'].strip() if meta and meta.get('content') else ''
-        if not company_desc and soup.title:
-            company_desc = soup.title.string.strip()
+        if meta and meta.get('content'):
+            parts.append(meta['content'].strip())
 
-        # 3. Najdi kariérní stránku
-        career_url = _find_career_url(soup, url)
-        jobs = []
-        career_info = ''
+        # 2. Hledej stránku "O nás" / "About"
+        about_keywords = ['o-nas', 'o-nás', 'o-spolecnosti', 'o-společnosti',
+                          'about', 'about-us', 'kdo-jsme', 'about-company']
+        about_url = None
+        for a in soup.find_all('a', href=True):
+            href = a['href'].lower()
+            txt = a.get_text(strip=True).lower()
+            if any(kw in href or kw == txt for kw in about_keywords):
+                from urllib.parse import urljoin, urlparse
+                full = urljoin(url, a['href'])
+                if urlparse(full).netloc == urlparse(url).netloc:
+                    about_url = full
+                    break
 
-        if career_url:
+        if about_url:
             try:
-                cresp = _fetch(career_url)
-                cresp.raise_for_status()
-                csoup = BeautifulSoup(cresp.text, 'html.parser')
-                jobs = _extract_jobs(csoup)
-                career_info = f'\n\nKariérní stránka: {career_url}'
+                aresp = _fetch(about_url)
+                if aresp.status_code == 200:
+                    asoup = BeautifulSoup(aresp.content, 'html.parser')
+                    paras = [p.get_text(' ', strip=True)
+                             for p in asoup.find_all('p')
+                             if len(p.get_text()) > 80]
+                    if paras:
+                        parts.append('\n'.join(paras[:3]))
             except Exception:
                 pass
 
-        # 4. Sestav výsledný popis
-        parts = []
-        if company_desc:
-            parts.append(company_desc)
-        if jobs:
-            parts.append('\n--- Aktuální nabídky práce ---')
-            for j in jobs:
-                parts.append(f'• {j}')
-        elif career_url:
-            parts.append('\n--- Kariérní stránka nalezena, ale žádné pozice nebyly rozpoznány ---')
-            parts.append(career_info)
-        else:
-            parts.append('\n--- Kariérní stránka nebyla nalezena ---')
+        # 3. Fallback — první odstavce z hlavní stránky
+        if not parts:
+            paras = [p.get_text(' ', strip=True)
+                     for p in soup.find_all('p') if len(p.get_text()) > 80]
+            if paras:
+                parts.append('\n'.join(paras[:2]))
 
-        client.web_description = '\n'.join(parts)[:2000]
-        db.session.commit()
-
-        if jobs:
-            flash(f'Načteno {len(jobs)} nabídek práce.', 'success')
+        if parts:
+            client.web_description = '\n\n'.join(parts)[:2000]
+            db.session.commit()
+            flash('Popis firmy byl načten.', 'success')
         else:
-            flash('Web načten, nabídky práce nebyly nalezeny.', 'warning')
+            flash('Web načten, ale popis se nepodařilo extrahovat.', 'warning')
 
     except Exception as e:
         flash(f'Chyba při načítání webu: {e}', 'danger')

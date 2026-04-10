@@ -18,7 +18,6 @@
   </a>
 </div>
 
-{% set size_colors = {'micro': 'secondary', 'small': 'info', 'medium': 'warning', 'large': 'success'} %}
 
 <!-- Row 1: Info + Contacts -->
 <div class="row g-4 mb-4">
@@ -54,7 +53,7 @@
               <td class="text-muted fw-semibold">Velikost</td>
               <td>
                 {% if client.size_category %}
-                  <span class="badge bg-{{ size_colors[client.size_category] }} text-dark">
+                  <span class="badge bg-{{ size_colors.get(client.size_category, 'secondary') }} text-dark">
                     {{ size_labels[client.size_category] }}
                   </span>
                 {% else %}
@@ -81,8 +80,8 @@
                   <a href="{{ client.website if client.website.startswith('http') else 'https://' + client.website }}"
                      target="_blank" class="text-decoration-none">{{ client.website }}</a>
                   <form method="post" action="{{ url_for('load_website', id=client.id) }}" class="d-inline ms-1">
-                    <button class="btn btn-outline-secondary btn-sm py-0 px-1" title="Načíst nabídky práce">
-                      <i class="bi bi-briefcase"></i> Práce
+                    <button class="btn btn-outline-secondary btn-sm py-0 px-1" title="Načíst popis firmy">
+                      <i class="bi bi-info-circle"></i> O firmě
                     </button>
                   </form>
                 {% else %}—{% endif %}
@@ -127,10 +126,10 @@
       </div>
     </div>
 
-    <!-- Nabídky práce -->
+    <!-- O firmě -->
     <div class="card">
       <div class="card-header bg-white py-2">
-        <span class="fw-semibold small"><i class="bi bi-briefcase me-2 text-muted"></i>Nabídky práce</span>
+        <span class="fw-semibold small"><i class="bi bi-briefcase me-2 text-muted"></i>O firmě</span>
       </div>
       <div class="card-body py-3 small">
         {% if client.web_description %}
