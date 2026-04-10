@@ -190,9 +190,10 @@ def dashboard():
 @app.route('/clients')
 @login_required
 def clients():
-    q = request.args.get('q', '').strip()
+    q    = request.args.get('q', '').strip()
     size = request.args.get('size', '').strip()
     temp = request.args.get('temp', '').strip()
+    sort = request.args.get('sort', 'category')   # category | alpha | size | contacts
     query = Client.query
     if q:
         query = query.filter(
@@ -204,11 +205,21 @@ def clients():
         query = query.filter(Client.size_category == size)
     if temp:
         query = query.filter(Client.temperature == temp)
-    all_clients = query.order_by(Client.name).all()
-    # Řadit: Hot → Neutrální → Cold → bez kategorie, pak abecedně
-    all_clients.sort(key=lambda c: (TEMP_ORDER.get(c.temperature, 3), c.name or ''))
-    return render_template('clients.html', clients=all_clients, q=q,
-                           size=size, temp=temp, size_labels=SIZE_LABELS)
+    all_clients = query.all()
+
+    SIZE_ORDER = {'freelancer': 0, 'micro': 1, 'small': 2,
+                  'medium': 3, 'large': 4, 'enterprise': 5}
+    if sort == 'alpha':
+        all_clients.sort(key=lambda c: (c.name or '').lower())
+    elif sort == 'size':
+        all_clients.sort(key=lambda c: (SIZE_ORDER.get(c.size_category, 99), (c.name or '').lower()))
+    elif sort == 'contacts':
+        all_clients.sort(key=lambda c: (-len(c.interactions), (c.name or '').lower()))
+    else:  # category (default)
+        all_clients.sort(key=lambda c: (TEMP_ORDER.get(c.temperature, 3), (c.name or '').lower()))
+
+    return render_template('clients.html', clients=all_clients,
+                           q=q, size=size, temp=temp, sort=sort)
 
 
 @app.route('/clients/new', methods=['GET', 'POST'])
@@ -275,6 +286,16 @@ def edit_client(id):
         flash('Klient byl upraven.', 'success')
         return redirect(url_for('client_detail', id=client.id))
     return render_template('client_form.html', client=client)
+
+
+@app.route('/clients/<int:id>/set-temperature', methods=['POST'])
+@login_required
+def set_temperature(id):
+    client = Client.query.get_or_404(id)
+    val = request.form.get('temperature', '').strip()
+    client.temperature = val if val in TEMP_LABELS else None
+    db.session.commit()
+    return redirect(request.referrer or url_for('clients'))
 
 
 @app.route('/clients/<int:id>/debug-ares')
