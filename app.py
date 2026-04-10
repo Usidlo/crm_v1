@@ -35,6 +35,20 @@ SIZE_COLORS = {
     'enterprise': 'primary',
 }
 
+TEMP_LABELS = {
+    'hot':     '🔥 Hot',
+    'neutral': 'Neutrální',
+    'cold':    '❄️ Cold',
+}
+
+TEMP_COLORS = {
+    'hot':     'danger',
+    'neutral': 'secondary',
+    'cold':    'info',
+}
+
+TEMP_ORDER = {'hot': 0, 'neutral': 1, 'cold': 2, None: 3}
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'crm-secret-key-2024'
 
@@ -79,7 +93,8 @@ db = SQLAlchemy(app)
 
 @app.context_processor
 def inject_globals():
-    return dict(size_labels=SIZE_LABELS, size_colors=SIZE_COLORS)
+    return dict(size_labels=SIZE_LABELS, size_colors=SIZE_COLORS,
+                temp_labels=TEMP_LABELS, temp_colors=TEMP_COLORS)
 
 
 # ── Models ─────────────────────────────────────────────────────────────────
@@ -97,6 +112,7 @@ class Client(db.Model):
     statutory = db.Column(db.Text)
     branches = db.Column(db.Text)
     size_category = db.Column(db.String(20))  # micro, small, medium, large
+    temperature = db.Column(db.String(10))    # hot, neutral, cold
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     interactions = db.relationship('Interaction', backref='client', lazy=True, cascade='all, delete-orphan')
@@ -176,6 +192,7 @@ def dashboard():
 def clients():
     q = request.args.get('q', '').strip()
     size = request.args.get('size', '').strip()
+    temp = request.args.get('temp', '').strip()
     query = Client.query
     if q:
         query = query.filter(
@@ -185,9 +202,13 @@ def clients():
         )
     if size:
         query = query.filter(Client.size_category == size)
+    if temp:
+        query = query.filter(Client.temperature == temp)
     all_clients = query.order_by(Client.name).all()
+    # Řadit: Hot → Neutrální → Cold → bez kategorie, pak abecedně
+    all_clients.sort(key=lambda c: (TEMP_ORDER.get(c.temperature, 3), c.name or ''))
     return render_template('clients.html', clients=all_clients, q=q,
-                           size=size, size_labels=SIZE_LABELS)
+                           size=size, temp=temp, size_labels=SIZE_LABELS)
 
 
 @app.route('/clients/new', methods=['GET', 'POST'])
@@ -195,6 +216,7 @@ def clients():
 def new_client():
     if request.method == 'POST':
         company = request.form.get('company', '').strip()
+        temp_val = request.form.get('temperature', '').strip()
         client = Client(
             name=company,
             company=company,
@@ -203,6 +225,7 @@ def new_client():
             phone=request.form.get('phone', '').strip(),
             website=request.form.get('website', '').strip(),
             notes=request.form.get('notes', '').strip(),
+            temperature=temp_val if temp_val in TEMP_LABELS else None,
         )
         db.session.add(client)
         db.session.commit()
@@ -246,6 +269,8 @@ def edit_client(id):
             client.size_category = size_val
         elif size_val == '':
             client.size_category = None
+        temp_val = request.form.get('temperature', '').strip()
+        client.temperature = temp_val if temp_val in TEMP_LABELS else None
         db.session.commit()
         flash('Klient byl upraven.', 'success')
         return redirect(url_for('client_detail', id=client.id))
@@ -1332,6 +1357,7 @@ with app.app_context():
             'ALTER TABLE client ADD COLUMN statutory TEXT',
             'ALTER TABLE client ADD COLUMN branches TEXT',
             'ALTER TABLE client ADD COLUMN size_category VARCHAR(20)',
+            'ALTER TABLE client ADD COLUMN temperature VARCHAR(10)',
         ]:
             try:
                 conn.execute(text(sql))

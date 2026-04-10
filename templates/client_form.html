@@ -43,16 +43,29 @@
                  value="{{ client.website if client and client.website else '' }}">
         </div>
       </div>
-      <div class="mb-3">
-        <label class="form-label fw-semibold">Velikost firmy</label>
-        <select name="size_category" class="form-select">
-          <option value="">— neznámá —</option>
-          {% for key, label in size_labels.items() %}
-          <option value="{{ key }}" {% if client and client.size_category == key %}selected{% endif %}>
-            {{ label }}
-          </option>
-          {% endfor %}
-        </select>
+      <div class="row g-3 mb-3">
+        <div class="col">
+          <label class="form-label fw-semibold">Velikost firmy</label>
+          <select name="size_category" class="form-select">
+            <option value="">— neznámá —</option>
+            {% for key, label in size_labels.items() %}
+            <option value="{{ key }}" {% if client and client.size_category == key %}selected{% endif %}>
+              {{ label }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col">
+          <label class="form-label fw-semibold">Kategorie</label>
+          <select name="temperature" class="form-select">
+            <option value="">— bez kategorie —</option>
+            {% for key, label in temp_labels.items() %}
+            <option value="{{ key }}" {% if client and client.temperature == key %}selected{% endif %}>
+              {{ label }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
       <div class="mb-4">
         <label class="form-label fw-semibold">Poznámky</label>

@@ -4,9 +4,15 @@
 
 <div class="d-flex align-items-center mb-4 gap-3 flex-wrap">
   <h2 class="fw-bold mb-0 me-auto">Klienti</h2>
-  <form class="d-flex gap-2 align-items-center" method="get">
-    <input class="form-control" name="q" value="{{ q }}" placeholder="Hledat…" style="width:180px">
-    <select class="form-select" name="size" style="width:175px">
+  <form class="d-flex gap-2 align-items-center flex-wrap" method="get">
+    <input class="form-control" name="q" value="{{ q }}" placeholder="Hledat…" style="width:160px">
+    <select class="form-select" name="temp" style="width:145px">
+      <option value="">Všechny kategorie</option>
+      {% for key, label in temp_labels.items() %}
+      <option value="{{ key }}" {% if temp == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select class="form-select" name="size" style="width:155px">
       <option value="">Všechny velikosti</option>
       {% for key, label in size_labels.items() %}
       <option value="{{ key }}" {% if size == key %}selected{% endif %}>{{ label }}</option>
@@ -15,7 +21,7 @@
     <button class="btn btn-outline-secondary btn-sm">
       <i class="bi bi-search"></i>
     </button>
-    {% if q or size %}
+    {% if q or size or temp %}
     <a href="{{ url_for('clients') }}" class="btn btn-outline-danger btn-sm" title="Zrušit filtry">
       <i class="bi bi-x-lg"></i>
     </a>
@@ -33,6 +39,7 @@
       <thead class="table-light">
         <tr>
           <th>Firma</th>
+          <th>Kategorie</th>
           <th>Velikost</th>
           <th>E-mail</th>
           <th>Telefon</th>
@@ -48,6 +55,13 @@
               {{ c.name }}
             </a>
             {% if c.address %}<div class="text-muted small">{{ c.address }}</div>{% endif %}
+          </td>
+          <td>
+            {% if c.temperature %}
+            <span class="badge bg-{{ temp_colors[c.temperature] }}">
+              {{ temp_labels[c.temperature] }}
+            </span>
+            {% else %}<span class="text-muted">—</span>{% endif %}
           </td>
           <td>
             {% if c.size_category %}
