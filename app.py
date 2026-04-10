@@ -279,31 +279,20 @@ def load_ares(id):
         if adresa:
             client.address = adresa
 
-        # Statutáři
-        statutory_parts = []
-        for rep in data.get('predstavitele', []):
-            jmeno = rep.get('jmeno', '')
-            funkce = rep.get('funkce', {})
-            if isinstance(funkce, dict):
-                funkce = funkce.get('nazev', '')
-            if jmeno:
-                statutory_parts.append(f'{jmeno} ({funkce})' if funkce else jmeno)
-        if statutory_parts:
-            client.statutory = '\n'.join(statutory_parts)
+        # Statutáři + velikost z kurzy.cz
+        scraped_statutory, scraped_size = _scrape_statutory_and_size(ico)
+        if scraped_statutory:
+            client.statutory = scraped_statutory
 
-        # Velikost firmy — nejdříve ARES, pak záložní zdroje
-        size_found = False
+        # Velikost — nejdřív ARES, pak kurzy.cz
         stat = data.get('statistickeUdaje') or {}
         emp_code = str(stat.get('pocetZamestnancuKod', ''))
         if emp_code in EMPLOYEE_CODE_TO_SIZE:
             client.size_category = EMPLOYEE_CODE_TO_SIZE[emp_code]
-            size_found = True
-        if not size_found:
-            scraped_size, _ = _scrape_size(ico, nazev)
-            if scraped_size:
-                client.size_category = scraped_size
+        elif scraped_size:
+            client.size_category = scraped_size
 
-        # Pobočky / provozovny
+        # Pobočky / provozovny — ARES RŽP (funguje pro živnostníky a s.r.o.)
         try:
             presp = _fetch(
                 f'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}/provozovny'
@@ -336,6 +325,82 @@ CAREER_KEYWORDS = [
     'join-us', 'join', 'team', 'tym', 'tým', 'recruit', 'employment',
     'pozice', 'nabidka', 'nabídka',
 ]
+
+
+STATUTORY_ROLES = [
+    'Předseda představenstva', 'Místopředseda představenstva', 'Člen představenstva',
+    'Předseda dozorčí rady', 'Místopředseda dozorčí rady', 'Člen dozorčí rady',
+    'Jednatel', 'Prokurista', 'Ředitel', 'Správce',
+]
+
+COUNTRIES = [
+    'Česká republika', 'Spolková republika Německo', 'Slovenská republika',
+    'Rakouská republika', 'Polská republika', 'Francouzská republika',
+    'Spojené království', 'Spojené státy', 'Švýcarská konfederace',
+]
+
+
+def _scrape_statutory_and_size(ico):
+    """
+    Načte statutáře a velikost firmy z kurzy.cz.
+    Vrátí (statutory_text, size_category).
+    """
+    try:
+        resp = _fetch(f'https://rejstrik-firem.kurzy.cz/{ico}/')
+        if resp.status_code not in (200, 301, 302):
+            return None, None
+        soup = BeautifulSoup(resp.content, 'html.parser')
+        text = soup.get_text(' ', strip=True)
+
+        # ── Statutáři ──────────────────────────────────────────────
+        statutory = []
+        idx = text.lower().find('statutární orgán')
+        if idx < 0:
+            idx = text.lower().find('statutár')
+        if idx >= 0:
+            block = text[idx:idx+3000]
+            # Pro každou roli najdi jméno které po ní následuje
+            role_pattern = '|'.join(re.escape(r) for r in STATUTORY_ROLES)
+            matches = list(re.finditer(role_pattern, block, re.I))
+            for i, m in enumerate(matches):
+                role = m.group(0)
+                # Jméno = text mezi koncem role a dalším matchem nebo "Den vzniku"
+                end = matches[i+1].start() if i+1 < len(matches) else min(m.end()+200, len(block))
+                name_chunk = block[m.end():end].strip()
+                # Odstraň země a "Den vzniku..." texty
+                for country in COUNTRIES:
+                    name_chunk = name_chunk.replace(country, '')
+                name_chunk = re.sub(r'Den vzniku.*', '', name_chunk, flags=re.I)
+                name_chunk = re.sub(r'Počet členů.*', '', name_chunk, flags=re.I)
+                name_chunk = re.sub(r'Způsob jednání.*', '', name_chunk, flags=re.I)
+                name = name_chunk.strip().strip(',').strip()
+                # Odfiltruj příliš dlouhé nebo prázdné
+                if name and len(name) < 80:
+                    statutory.append(f'{role}: {name}')
+                # Zastav u dozorčí rady — zobrazíme jen představenstvo/jednatele
+                if 'dozorčí rada' in role.lower() and len(statutory) > 5:
+                    break
+
+        statutory_text = '\n'.join(statutory) if statutory else None
+
+        # ── Velikost ───────────────────────────────────────────────
+        size = None
+        m = re.search(r'po[čc]et\s+zam[eě]stnanc[ůu][^\d]*(\d[\d\s]*)', text, re.I)
+        if m:
+            count = int(re.sub(r'\s', '', m.group(1)))
+            if count < 10:
+                size = 'micro'
+            elif count < 50:
+                size = 'small'
+            elif count < 500:
+                size = 'medium'
+            else:
+                size = 'large'
+
+        return statutory_text, size
+
+    except Exception:
+        return None, None
 
 
 def _scrape_size(ico, company_name=''):
