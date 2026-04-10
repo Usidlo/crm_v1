@@ -1143,6 +1143,83 @@ def export_contacts():
     )
 
 
+# ── Routes: Import klientů ──────────────────────────────────────────────────
+
+@app.route('/import/clients', methods=['GET', 'POST'])
+@login_required
+def import_clients():
+    import csv
+    from io import StringIO, TextIOWrapper
+
+    if request.method == 'GET':
+        return render_template('import_clients.html')
+
+    f = request.files.get('csvfile')
+    if not f or not f.filename.endswith('.csv'):
+        flash('Nahraj prosím soubor ve formátu .csv', 'danger')
+        return redirect(url_for('import_clients'))
+
+    try:
+        stream = TextIOWrapper(f.stream, encoding='utf-8-sig')  # utf-8-sig zvládne BOM z Excelu
+        reader = csv.DictReader(stream)
+
+        EXPECTED = {'Název firmy', 'IČO', 'E-mail', 'Telefon', 'Web',
+                    'Kategorie', 'Velikost', 'Poznámky'}
+        if not EXPECTED.issubset(set(reader.fieldnames or [])):
+            flash('Soubor nemá správné sloupce. Stáhni šablonu a použij ji.', 'danger')
+            return redirect(url_for('import_clients'))
+
+        added = skipped = errors = 0
+        for row in reader:
+            name = row['Název firmy'].strip()
+            if not name:
+                continue
+            ico = row['IČO'].strip()
+
+            # Kontrola duplicit — podle IČO (pokud je), jinak podle názvu
+            if ico:
+                exists = Client.query.filter_by(ico=ico).first()
+            else:
+                exists = Client.query.filter(Client.name.ilike(name)).first()
+            if exists:
+                skipped += 1
+                continue
+
+            temp_val = row['Kategorie'].strip().lower()
+            size_val = row['Velikost'].strip().lower()
+
+            try:
+                client = Client(
+                    name=name,
+                    company=name,
+                    ico=ico or None,
+                    email=row['E-mail'].strip() or None,
+                    phone=row['Telefon'].strip() or None,
+                    website=row['Web'].strip() or None,
+                    notes=row['Poznámky'].strip() or None,
+                    temperature=temp_val if temp_val in TEMP_LABELS else None,
+                    size_category=size_val if size_val in SIZE_LABELS else None,
+                )
+                db.session.add(client)
+                added += 1
+            except Exception:
+                errors += 1
+
+        db.session.commit()
+
+        parts = [f'Přidáno {added} klientů.']
+        if skipped:
+            parts.append(f'{skipped} přeskočeno (duplicita).')
+        if errors:
+            parts.append(f'{errors} chyb.')
+        flash(' '.join(parts), 'success' if added else 'warning')
+
+    except Exception as e:
+        flash(f'Chyba při čtení souboru: {e}', 'danger')
+
+    return redirect(url_for('clients'))
+
+
 # ── Routes: Reminders ───────────────────────────────────────────────────────
 
 @app.route('/reminders')

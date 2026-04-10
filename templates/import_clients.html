@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Import klientů – Sales PD{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <a href="{{ url_for('clients') }}" class="btn btn-sm btn-outline-secondary me-3">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h2 class="fw-bold mb-0">Import klientů z CSV</h2>
+</div>
+
+<div class="row g-4" style="max-width:700px">
+
+  <!-- Upload formulář -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-4">
+        <h5 class="fw-semibold mb-3"><i class="bi bi-upload me-2 text-muted"></i>Nahrát soubor</h5>
+        <form method="post" enctype="multipart/form-data">
+          <div class="mb-3">
+            <input type="file" name="csvfile" accept=".csv" class="form-control" required>
+            <div class="form-text">Pouze soubory .csv (max. 5 MB)</div>
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-cloud-upload me-1"></i>Importovat
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Šablona a instrukce -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-4">
+        <h5 class="fw-semibold mb-3"><i class="bi bi-file-earmark-spreadsheet me-2 text-muted"></i>Šablona a formát</h5>
+
+        <a href="{{ url_for('static', filename='sablona_import_klientu.csv') }}"
+           class="btn btn-outline-success mb-4" download>
+          <i class="bi bi-download me-1"></i>Stáhnout šablonu CSV
+        </a>
+
+        <p class="text-muted small mb-2">Soubor musí mít tyto sloupce (první řádek = záhlaví):</p>
+        <table class="table table-sm table-bordered small mb-3">
+          <thead class="table-light">
+            <tr>
+              <th>Sloupec</th>
+              <th>Povinný</th>
+              <th>Možné hodnoty</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="fw-semibold">Název firmy</td><td><span class="badge bg-danger">ano</span></td><td>libovolný text</td></tr>
+            <tr><td class="fw-semibold">IČO</td><td>ne</td><td>8místné číslo</td></tr>
+            <tr><td class="fw-semibold">E-mail</td><td>ne</td><td>libovolný e-mail</td></tr>
+            <tr><td class="fw-semibold">Telefon</td><td>ne</td><td>libovolný formát</td></tr>
+            <tr><td class="fw-semibold">Web</td><td>ne</td><td>https://...</td></tr>
+            <tr><td class="fw-semibold">Kategorie</td><td>ne</td><td><code>hot</code>, <code>neutral</code>, <code>cold</code></td></tr>
+            <tr><td class="fw-semibold">Velikost</td><td>ne</td><td><code>freelancer</code>, <code>micro</code>, <code>small</code>, <code>medium</code>, <code>large</code>, <code>enterprise</code></td></tr>
+            <tr><td class="fw-semibold">Poznámky</td><td>ne</td><td>libovolný text</td></tr>
+          </tbody>
+        </table>
+
+        <div class="alert alert-info small mb-0">
+          <i class="bi bi-info-circle me-1"></i>
+          <strong>Duplikáty:</strong> Firmy se stejným IČO (nebo stejným názvem, pokud IČO chybí) budou přeskočeny.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
