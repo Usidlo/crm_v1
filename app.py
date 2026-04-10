@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from datetime import datetime
 from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 import requests
 import os
 import re
@@ -52,32 +53,44 @@ TEMP_ORDER = {'hot': 0, 'neutral': 1, 'cold': 2, None: 3}
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'crm-secret-key-2024'
 
-# ── Přihlášení ──────────────────────────────────────────────────────────────
-
-LOGIN_USERNAME = 'admin'
-LOGIN_PASSWORD = 'ProlusiDynamika'
-
+# ── Přihlášení & Uživatelé ──────────────────────────────────────────────────
 
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if not session.get('logged_in'):
+        if not session.get('user_id'):
             return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('user_id'):
+            return redirect(url_for('login'))
+        if not session.get('is_admin'):
+            flash('Tato stránka je přístupná pouze administrátorovi.', 'danger')
+            return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return decorated
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if session.get('logged_in'):
+    if session.get('user_id'):
         return redirect(url_for('dashboard'))
     error = None
     if request.method == 'POST':
-        if (request.form['username'] == LOGIN_USERNAME and
-                request.form['password'] == LOGIN_PASSWORD):
-            session['logged_in'] = True
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        user = User.query.filter_by(username=username).first()
+        if user and user.is_active and check_password_hash(user.password_hash, password):
+            session['user_id'] = user.id
+            session['username'] = user.username
+            session['is_admin'] = user.is_admin
             return redirect(url_for('dashboard'))
-        error = 'Špatné jméno nebo heslo.'
+        error = 'Špatné jméno nebo heslo, nebo účet je deaktivován.'
     return render_template('login.html', error=error)
 
 
@@ -93,11 +106,28 @@ db = SQLAlchemy(app)
 
 @app.context_processor
 def inject_globals():
+    current_user = None
+    if session.get('user_id'):
+        current_user = {
+            'id':       session['user_id'],
+            'username': session.get('username'),
+            'is_admin': session.get('is_admin', False),
+        }
     return dict(size_labels=SIZE_LABELS, size_colors=SIZE_COLORS,
-                temp_labels=TEMP_LABELS, temp_colors=TEMP_COLORS)
+                temp_labels=TEMP_LABELS, temp_colors=TEMP_COLORS,
+                current_user=current_user)
 
 
 # ── Models ─────────────────────────────────────────────────────────────────
+
+class User(db.Model):
+    id            = db.Column(db.Integer, primary_key=True)
+    username      = db.Column(db.String(100), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+    is_admin      = db.Column(db.Boolean, default=False, nullable=False)
+    is_active     = db.Column(db.Boolean, default=True, nullable=False)
+    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1441,10 +1471,85 @@ def delete_member(id):
     return redirect(url_for('team'))
 
 
+# ── Routes: Admin — správa uživatelů ────────────────────────────────────────
+
+@app.route('/admin/users')
+@admin_required
+def admin_users():
+    users = User.query.order_by(User.username).all()
+    return render_template('admin_users.html', users=users)
+
+
+@app.route('/admin/users/new', methods=['GET', 'POST'])
+@admin_required
+def admin_new_user():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        is_admin = bool(request.form.get('is_admin'))
+        if not username or not password:
+            flash('Uživatelské jméno a heslo jsou povinné.', 'danger')
+            return render_template('admin_user_form.html', user=None)
+        if User.query.filter_by(username=username).first():
+            flash(f'Uživatel „{username}" již existuje.', 'danger')
+            return render_template('admin_user_form.html', user=None)
+        user = User(username=username,
+                    password_hash=generate_password_hash(password),
+                    is_admin=is_admin,
+                    is_active=True)
+        db.session.add(user)
+        db.session.commit()
+        flash(f'Uživatel „{username}" byl vytvořen.', 'success')
+        return redirect(url_for('admin_users'))
+    return render_template('admin_user_form.html', user=None)
+
+
+@app.route('/admin/users/<int:id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_edit_user(id):
+    user = User.query.get_or_404(id)
+    if request.method == 'POST':
+        new_password = request.form.get('password', '').strip()
+        if new_password:
+            user.password_hash = generate_password_hash(new_password)
+        # Admin nemůže sám sobě odebrat admin práva ani deaktivovat sám sebe
+        if user.id != session['user_id']:
+            user.is_admin  = bool(request.form.get('is_admin'))
+            user.is_active = bool(request.form.get('is_active'))
+        db.session.commit()
+        flash(f'Uživatel „{user.username}" byl upraven.', 'success')
+        return redirect(url_for('admin_users'))
+    return render_template('admin_user_form.html', user=user)
+
+
+@app.route('/admin/users/<int:id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_user(id):
+    user = User.query.get_or_404(id)
+    if user.id == session['user_id']:
+        flash('Nemůžeš smazat sám sebe.', 'danger')
+        return redirect(url_for('admin_users'))
+    username = user.username
+    db.session.delete(user)
+    db.session.commit()
+    flash(f'Uživatel „{username}" byl smazán.', 'warning')
+    return redirect(url_for('admin_users'))
+
+
 # ── Init ────────────────────────────────────────────────────────────────────
 
 with app.app_context():
     db.create_all()
+    # Vytvoř výchozího admina, pokud žádný uživatel neexistuje
+    if User.query.count() == 0:
+        admin = User(
+            username='admin',
+            password_hash=generate_password_hash('ProlusiDynamika'),
+            is_admin=True,
+            is_active=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
     with db.engine.connect() as conn:
         for sql in [
             'ALTER TABLE interaction ADD COLUMN contact_person_id INTEGER REFERENCES contact_person(id)',

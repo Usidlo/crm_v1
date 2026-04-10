@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block title %}Správa uživatelů – Sales PD{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <h2 class="fw-bold mb-0 me-auto">Správa uživatelů</h2>
+  <a href="{{ url_for('admin_new_user') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Nový uživatel
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Uživatelské jméno</th>
+          <th>Role</th>
+          <th>Stav</th>
+          <th>Vytvořen</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td class="fw-semibold">
+            {{ u.username }}
+            {% if u.id == current_user.id %}
+              <span class="badge bg-secondary ms-1">já</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.is_admin %}
+              <span class="badge bg-danger">Admin</span>
+            {% else %}
+              <span class="badge bg-light text-dark border">Uživatel</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.is_active %}
+              <span class="badge bg-success">Aktivní</span>
+            {% else %}
+              <span class="badge bg-secondary">Deaktivován</span>
+            {% endif %}
+          </td>
+          <td class="text-muted small">{{ u.created_at.strftime('%d.%m.%Y') }}</td>
+          <td class="text-end text-nowrap">
+            <a href="{{ url_for('admin_edit_user', id=u.id) }}"
+               class="btn btn-sm btn-outline-secondary me-1">
+              <i class="bi bi-pencil"></i>
+            </a>
+            {% if u.id != current_user.id %}
+            <form method="post" action="{{ url_for('admin_delete_user', id=u.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('Smazat uživatele {{ u.username }}?')">
+              <button class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
