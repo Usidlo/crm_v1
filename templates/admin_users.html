@@ -15,6 +15,7 @@
       <thead class="table-light">
         <tr>
           <th>Uživatelské jméno</th>
+          <th>Člen týmu</th>
           <th>Role</th>
           <th>Stav</th>
           <th>Vytvořen</th>
@@ -28,6 +29,15 @@
             {{ u.username }}
             {% if u.id == current_user.id %}
               <span class="badge bg-secondary ms-1">já</span>
+            {% endif %}
+          </td>
+          <td class="small">
+            {% if u.team_member %}
+              <span class="badge bg-light text-dark border">
+                <i class="bi bi-person me-1"></i>{{ u.team_member.name }}
+              </span>
+            {% else %}
+              <span class="text-muted">—</span>
             {% endif %}
           </td>
           <td>

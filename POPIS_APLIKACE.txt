@@ -3,7 +3,7 @@
   CRM systém pro obchodní tým
 ================================================================================
 
-Naposledy aktualizováno: 2026-04-10 (přidán user management)
+Naposledy aktualizováno: 2026-04-10 (user management + propojení uživatelů s týmem)
 
 --------------------------------------------------------------------------------
 CO APLIKACE DĚLÁ
@@ -53,6 +53,11 @@ Ochranná pravidla:
 
 Všichni uživatelé vidí stejná data — sdílenou databázi klientů.
 Každý může vše editovat (přidávat klienty, interakce, remindry atd.).
+
+Každému uživateli lze přiřadit "Člen týmu" — propojení s konkrétní osobou v týmu.
+Toto propojení zajistí, že při zapisování aktivity nebo reminderu se dané jméno
+automaticky předvyplní. Uživatel ale může aktivitu nebo reminder zapsat i za
+kohokoli jiného z týmu — stačí v dropdownu vybrat jiné jméno.
 
 
 --------------------------------------------------------------------------------

@@ -86,9 +86,10 @@ def login():
         password = request.form.get('password', '')
         user = User.query.filter_by(username=username).first()
         if user and user.is_active and check_password_hash(user.password_hash, password):
-            session['user_id'] = user.id
-            session['username'] = user.username
-            session['is_admin'] = user.is_admin
+            session['user_id']        = user.id
+            session['username']       = user.username
+            session['is_admin']       = user.is_admin
+            session['team_member_id'] = user.team_member_id
             return redirect(url_for('dashboard'))
         error = 'Špatné jméno nebo heslo, nebo účet je deaktivován.'
     return render_template('login.html', error=error)
@@ -121,12 +122,14 @@ def inject_globals():
 # ── Models ─────────────────────────────────────────────────────────────────
 
 class User(db.Model):
-    id            = db.Column(db.Integer, primary_key=True)
-    username      = db.Column(db.String(100), unique=True, nullable=False)
-    password_hash = db.Column(db.String(256), nullable=False)
-    is_admin      = db.Column(db.Boolean, default=False, nullable=False)
-    is_active     = db.Column(db.Boolean, default=True, nullable=False)
-    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+    id             = db.Column(db.Integer, primary_key=True)
+    username       = db.Column(db.String(100), unique=True, nullable=False)
+    password_hash  = db.Column(db.String(256), nullable=False)
+    is_admin       = db.Column(db.Boolean, default=False, nullable=False)
+    is_active      = db.Column(db.Boolean, default=True, nullable=False)
+    team_member_id = db.Column(db.Integer, db.ForeignKey('team_member.id'), nullable=True)
+    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+    team_member    = db.relationship('TeamMember', backref='user', uselist=False)
 
 
 class Client(db.Model):
@@ -1313,7 +1316,8 @@ def new_reminder(client_id):
         return redirect(url_for('client_detail', id=client_id))
     default_due = datetime.now().strftime('%Y-%m-%dT%H:%M')
     return render_template('reminder_form.html', client=client, reminder=None,
-                           members=members, default_due=default_due)
+                           members=members, default_due=default_due,
+                           default_member_id=session.get('team_member_id'))
 
 
 @app.route('/reminders/<int:id>/edit', methods=['GET', 'POST'])
@@ -1383,6 +1387,7 @@ def new_interaction(client_id):
         return redirect(url_for('client_detail', id=client_id))
     return render_template('interaction_form.html', client=client, members=members,
                            contacts=contacts, interaction=None,
+                           default_member_id=session.get('team_member_id'),
                            now=datetime.now().strftime('%Y-%m-%dT%H:%M'))
 
 
@@ -1483,31 +1488,35 @@ def admin_users():
 @app.route('/admin/users/new', methods=['GET', 'POST'])
 @admin_required
 def admin_new_user():
+    members = TeamMember.query.order_by(TeamMember.name).all()
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         is_admin = bool(request.form.get('is_admin'))
+        tm_id    = request.form.get('team_member_id') or None
         if not username or not password:
             flash('Uživatelské jméno a heslo jsou povinné.', 'danger')
-            return render_template('admin_user_form.html', user=None)
+            return render_template('admin_user_form.html', user=None, members=members)
         if User.query.filter_by(username=username).first():
             flash(f'Uživatel „{username}" již existuje.', 'danger')
-            return render_template('admin_user_form.html', user=None)
+            return render_template('admin_user_form.html', user=None, members=members)
         user = User(username=username,
                     password_hash=generate_password_hash(password),
                     is_admin=is_admin,
-                    is_active=True)
+                    is_active=True,
+                    team_member_id=int(tm_id) if tm_id else None)
         db.session.add(user)
         db.session.commit()
         flash(f'Uživatel „{username}" byl vytvořen.', 'success')
         return redirect(url_for('admin_users'))
-    return render_template('admin_user_form.html', user=None)
+    return render_template('admin_user_form.html', user=None, members=members)
 
 
 @app.route('/admin/users/<int:id>/edit', methods=['GET', 'POST'])
 @admin_required
 def admin_edit_user(id):
     user = User.query.get_or_404(id)
+    members = TeamMember.query.order_by(TeamMember.name).all()
     if request.method == 'POST':
         new_password = request.form.get('password', '').strip()
         if new_password:
@@ -1516,10 +1525,15 @@ def admin_edit_user(id):
         if user.id != session['user_id']:
             user.is_admin  = bool(request.form.get('is_admin'))
             user.is_active = bool(request.form.get('is_active'))
+        tm_id = request.form.get('team_member_id') or None
+        user.team_member_id = int(tm_id) if tm_id else None
         db.session.commit()
+        # Aktualizuj session pokud admin mění sám sebe
+        if user.id == session['user_id']:
+            session['team_member_id'] = user.team_member_id
         flash(f'Uživatel „{user.username}" byl upraven.', 'success')
         return redirect(url_for('admin_users'))
-    return render_template('admin_user_form.html', user=user)
+    return render_template('admin_user_form.html', user=user, members=members)
 
 
 @app.route('/admin/users/<int:id>/delete', methods=['POST'])
@@ -1540,16 +1554,7 @@ def admin_delete_user(id):
 
 with app.app_context():
     db.create_all()
-    # Vytvoř výchozího admina, pokud žádný uživatel neexistuje
-    if User.query.count() == 0:
-        admin = User(
-            username='admin',
-            password_hash=generate_password_hash('ProlusiDynamika'),
-            is_admin=True,
-            is_active=True,
-        )
-        db.session.add(admin)
-        db.session.commit()
+    # Migrace — přidej sloupce, které v starší DB chybí
     with db.engine.connect() as conn:
         for sql in [
             'ALTER TABLE interaction ADD COLUMN contact_person_id INTEGER REFERENCES contact_person(id)',
@@ -1561,12 +1566,23 @@ with app.app_context():
             'ALTER TABLE client ADD COLUMN branches TEXT',
             'ALTER TABLE client ADD COLUMN size_category VARCHAR(20)',
             'ALTER TABLE client ADD COLUMN temperature VARCHAR(10)',
+            'ALTER TABLE user ADD COLUMN team_member_id INTEGER REFERENCES team_member(id)',
         ]:
             try:
                 conn.execute(text(sql))
                 conn.commit()
             except Exception:
                 pass
+    # Vytvoř výchozího admina, pokud žádný uživatel neexistuje
+    if User.query.count() == 0:
+        admin = User(
+            username='admin',
+            password_hash=generate_password_hash('ProlusiDynamika'),
+            is_admin=True,
+            is_active=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

@@ -47,7 +47,10 @@
         <select name="member_id" class="form-select" required>
           {% for m in members %}
           <option value="{{ m.id }}"
-            {% if interaction and interaction.member_id == m.id %}selected{% endif %}>
+            {% if interaction %}
+              {% if interaction.member_id == m.id %}selected{% endif %}
+            {% elif default_member_id == m.id %}selected
+            {% endif %}>
             {{ m.name }}
           </option>
           {% endfor %}
