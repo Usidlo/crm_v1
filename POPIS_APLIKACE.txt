@@ -3,7 +3,7 @@
   CRM systém pro obchodní tým
 ================================================================================
 
-Naposledy aktualizováno: 2026-04-10
+Naposledy aktualizováno: 2026-04-10 (přidán user management)
 
 --------------------------------------------------------------------------------
 CO APLIKACE DĚLÁ
@@ -18,18 +18,41 @@ Zdrojový kód je uložen na GitHubu: https://github.com/Usidlo/crm_v1
 
 
 --------------------------------------------------------------------------------
-PŘIHLÁŠENÍ
+PŘIHLÁŠENÍ A UŽIVATELSKÉ ÚČTY
 --------------------------------------------------------------------------------
 
 Aplikace je chráněna heslem. Bez přihlášení není dostupná žádná stránka —
 systém přesměruje na přihlašovací formulář.
 
-Přihlašovací údaje:
+Každý uživatel má vlastní účet (jméno + heslo). Hesla jsou bezpečně hashována,
+nikde se neukládají v čitelné podobě.
+
+Výchozí admin účet (vytvořen při prvním spuštění):
   Uživatelské jméno: admin
   Heslo: ProlusiDynamika
 
 Po přihlášení zůstane uživatel přihlášen, dokud se sám neodhlásí tlačítkem
-"Odhlásit" v levém menu.
+"Odhlásit" v levém menu. V levém menu je vždy vidět jméno přihlášeného uživatele.
+
+
+--------------------------------------------------------------------------------
+SPRÁVA UŽIVATELŮ (jen pro admina)
+--------------------------------------------------------------------------------
+
+Odkaz "Uživatelé" v levém menu je viditelný pouze administrátorovi.
+Admin může:
+  - Přidat nového uživatele (jméno + heslo + volitelně admin práva)
+  - Změnit heslo libovolnému uživateli
+  - Přidělit nebo odebrat admin práva
+  - Deaktivovat účet (uživatel se nemůže přihlásit, ale data zůstanou)
+  - Smazat účet
+
+Ochranná pravidla:
+  - Admin nemůže smazat ani deaktivovat sám sebe
+  - Admin nemůže sám sobě odebrat admin práva
+
+Všichni uživatelé vidí stejná data — sdílenou databázi klientů.
+Každý může vše editovat (přidávat klienty, interakce, remindry atd.).
 
 
 --------------------------------------------------------------------------------
