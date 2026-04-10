@@ -235,6 +235,23 @@ def edit_client(id):
     return render_template('client_form.html', client=client)
 
 
+@app.route('/clients/<int:id>/debug-ares')
+@login_required
+def debug_ares(id):
+    client = Client.query.get_or_404(id)
+    ico = client.ico.strip() if client.ico else ''
+    if not ico:
+        return jsonify({'error': 'Chybí IČO'})
+    try:
+        resp = _fetch(f'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}')
+        data = resp.json()
+        presp = _fetch(f'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}/provozovny')
+        pdata = presp.json() if presp.status_code == 200 else {'status': presp.status_code}
+        return jsonify({'zakladni': data, 'provozovny': pdata})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
 @app.route('/clients/<int:id>/load-ares', methods=['POST'])
 @login_required
 def load_ares(id):
