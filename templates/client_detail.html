@@ -18,85 +18,129 @@
   </a>
 </div>
 
+{% set size_colors = {'micro': 'secondary', 'small': 'info', 'medium': 'warning', 'large': 'success'} %}
+
 <!-- Row 1: Info + Contacts -->
 <div class="row g-4 mb-4">
   <!-- Client info -->
-  <div class="col-md-4">
-    <div class="card h-100">
-      <div class="card-body">
-        <h6 class="text-muted text-uppercase small fw-semibold mb-3">Kontaktní údaje</h6>
+  <div class="col-md-5">
+
+    <!-- Základní info -->
+    <div class="card mb-3">
+      <div class="card-header bg-white d-flex align-items-center py-2">
+        <span class="fw-semibold small me-auto">
+          <i class="bi bi-building me-2 text-muted"></i>Základní informace
+        </span>
         {% if client.ico %}
-        <div class="mb-2">
-          <i class="bi bi-hash text-muted me-2"></i>
-          <span class="fw-semibold">IČO:</span> {{ client.ico }}
-          <form method="post" action="{{ url_for('load_ares', id=client.id) }}" class="d-inline ms-2">
-            <button class="btn btn-outline-secondary btn-sm py-0 px-1" title="Načíst z ARES">
-              <i class="bi bi-cloud-download"></i> ARES
-            </button>
-          </form>
-        </div>
+        <form method="post" action="{{ url_for('load_ares', id=client.id) }}" class="d-inline">
+          <button class="btn btn-outline-secondary btn-sm py-0 px-2">
+            <i class="bi bi-cloud-download me-1"></i>Načíst z ARES
+          </button>
+        </form>
         {% endif %}
-        {% if client.size_category %}
-        <div class="mb-2">
-          <i class="bi bi-people text-muted me-2"></i>
-          {% set size_colors = {'micro': 'secondary', 'small': 'info', 'medium': 'warning', 'large': 'success'} %}
-          <span class="badge bg-{{ size_colors[client.size_category] }} text-dark">
-            {{ size_labels[client.size_category] }}
-          </span>
-        </div>
-        {% endif %}
-        {% if client.address %}
-        <div class="mb-2">
-          <i class="bi bi-geo-alt text-muted me-2"></i><span class="small">{{ client.address }}</span>
-        </div>
-        {% endif %}
-        {% if client.email %}
-        <div class="mb-2">
-          <i class="bi bi-envelope text-muted me-2"></i>
-          <a href="mailto:{{ client.email }}" class="text-decoration-none">{{ client.email }}</a>
-        </div>
-        {% endif %}
-        {% if client.phone %}
-        <div class="mb-2">
-          <i class="bi bi-telephone text-muted me-2"></i>{{ client.phone }}
-        </div>
-        {% endif %}
-        {% if client.website %}
-        <div class="mb-2">
-          <i class="bi bi-globe text-muted me-2"></i>
-          <a href="{{ client.website if client.website.startswith('http') else 'https://' + client.website }}"
-             target="_blank" class="text-decoration-none">{{ client.website }}</a>
-          <form method="post" action="{{ url_for('load_website', id=client.id) }}" class="d-inline ms-2">
-            <button class="btn btn-outline-secondary btn-sm py-0 px-1" title="Načíst nabídky práce">
-              <i class="bi bi-cloud-download"></i> Práce
-            </button>
-          </form>
-        </div>
-        {% endif %}
-        {% if client.statutory %}
-        <hr>
-        <h6 class="text-muted text-uppercase small fw-semibold mb-2">Statutáři</h6>
-        <div class="small mb-0" style="white-space:pre-wrap;">{{ client.statutory }}</div>
-        {% endif %}
-        {% if client.branches %}
-        <hr>
-        <h6 class="text-muted text-uppercase small fw-semibold mb-2">Pobočky / provozovny</h6>
-        <div class="small mb-0" style="white-space:pre-wrap;">{{ client.branches }}</div>
-        {% endif %}
-        {% if client.web_description %}
-        <hr>
-        <h6 class="text-muted text-uppercase small fw-semibold mb-2">Nabídky práce</h6>
-        <div class="small mb-0" style="white-space:pre-wrap;">{{ client.web_description }}</div>
-        {% endif %}
+      </div>
+      <div class="card-body py-3">
+        <table class="table table-sm table-borderless mb-0 small">
+          <tbody>
+            <tr>
+              <td class="text-muted fw-semibold" style="width:35%">IČO</td>
+              <td>{{ client.ico or '—' }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted fw-semibold">Sídlo</td>
+              <td>{{ client.address or '<span class="text-muted fst-italic">nenačteno</span>'|safe }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted fw-semibold">Velikost</td>
+              <td>
+                {% if client.size_category %}
+                  <span class="badge bg-{{ size_colors[client.size_category] }} text-dark">
+                    {{ size_labels[client.size_category] }}
+                  </span>
+                {% else %}
+                  <span class="text-muted fst-italic">nenačteno</span>
+                {% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td class="text-muted fw-semibold">E-mail</td>
+              <td>
+                {% if client.email %}
+                  <a href="mailto:{{ client.email }}" class="text-decoration-none">{{ client.email }}</a>
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td class="text-muted fw-semibold">Telefon</td>
+              <td>{{ client.phone or '—' }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted fw-semibold">Web</td>
+              <td>
+                {% if client.website %}
+                  <a href="{{ client.website if client.website.startswith('http') else 'https://' + client.website }}"
+                     target="_blank" class="text-decoration-none">{{ client.website }}</a>
+                  <form method="post" action="{{ url_for('load_website', id=client.id) }}" class="d-inline ms-1">
+                    <button class="btn btn-outline-secondary btn-sm py-0 px-1" title="Načíst nabídky práce">
+                      <i class="bi bi-briefcase"></i> Práce
+                    </button>
+                  </form>
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+          </tbody>
+        </table>
         {% if client.notes %}
-        <hr>
-        <h6 class="text-muted text-uppercase small fw-semibold mb-2">Poznámky</h6>
-        <p class="small mb-0">{{ client.notes }}</p>
+        <hr class="my-2">
+        <div class="text-muted small fw-semibold mb-1">Poznámky</div>
+        <div class="small">{{ client.notes }}</div>
         {% endif %}
-        <hr>
-        <div class="text-muted small">Přidán {{ client.created_at.strftime('%d.%m.%Y') }}</div>
+        <div class="text-muted small mt-2">Přidán {{ client.created_at.strftime('%d.%m.%Y') }}</div>
       </div>
     </div>
+
+    <!-- Statutáři -->
+    <div class="card mb-3">
+      <div class="card-header bg-white py-2">
+        <span class="fw-semibold small"><i class="bi bi-person-check me-2 text-muted"></i>Statutáři</span>
+      </div>
+      <div class="card-body py-3 small">
+        {% if client.statutory %}
+          <div style="white-space:pre-wrap;">{{ client.statutory }}</div>
+        {% else %}
+          <span class="text-muted fst-italic">Nenačteno — použij tlačítko „Načíst z ARES"</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Pobočky -->
+    <div class="card mb-3">
+      <div class="card-header bg-white py-2">
+        <span class="fw-semibold small"><i class="bi bi-geo-alt me-2 text-muted"></i>Pobočky / provozovny</span>
+      </div>
+      <div class="card-body py-3 small">
+        {% if client.branches %}
+          <div style="white-space:pre-wrap;">{{ client.branches }}</div>
+        {% else %}
+          <span class="text-muted fst-italic">Nenačteno — použij tlačítko „Načíst z ARES"</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Nabídky práce -->
+    <div class="card">
+      <div class="card-header bg-white py-2">
+        <span class="fw-semibold small"><i class="bi bi-briefcase me-2 text-muted"></i>Nabídky práce</span>
+      </div>
+      <div class="card-body py-3 small">
+        {% if client.web_description %}
+          <div style="white-space:pre-wrap;">{{ client.web_description }}</div>
+        {% else %}
+          <span class="text-muted fst-italic">Nenačteno — zadej web a použij tlačítko „Práce"</span>
+        {% endif %}
+      </div>
+    </div>
+
   </div>
 
   <!-- Contact persons -->
