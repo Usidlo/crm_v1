@@ -1,0 +1,344 @@
+================================================================================
+  SALES PD — POPIS APLIKACE
+  CRM systém pro obchodní tým
+================================================================================
+
+Naposledy aktualizováno: 2026-04-10
+
+--------------------------------------------------------------------------------
+CO APLIKACE DĚLÁ
+--------------------------------------------------------------------------------
+
+Sales PD je webová aplikace pro správu obchodních vztahů (CRM). Slouží obchodnímu
+týmu k evidenci firem (klientů), sledování komunikace s nimi, plánování úkolů
+a sdílení kontaktů na klíčové osoby ve firmách.
+
+Aplikace běží v prohlížeči na adrese: https://crmv1-production-8e85.up.railway.app
+Zdrojový kód je uložen na GitHubu: https://github.com/Usidlo/crm_v1
+
+
+--------------------------------------------------------------------------------
+PŘIHLÁŠENÍ
+--------------------------------------------------------------------------------
+
+Aplikace je chráněna heslem. Bez přihlášení není dostupná žádná stránka —
+systém přesměruje na přihlašovací formulář.
+
+Přihlašovací údaje:
+  Uživatelské jméno: admin
+  Heslo: ProlusiDynamika
+
+Po přihlášení zůstane uživatel přihlášen, dokud se sám neodhlásí tlačítkem
+"Odhlásit" v levém menu.
+
+
+--------------------------------------------------------------------------------
+NAVIGACE (levý sloupec — sidebar)
+--------------------------------------------------------------------------------
+
+V levé části obrazovky je vždy viditelné menu s těmito položkami:
+
+  Přehled      — úvodní dashboard s přehledem aktivit
+  Klienti      — seznam všech firem
+  Tým          — seznam členů obchodního týmu
+  Remindry     — přehled všech naplánovaných úkolů
+
+Dole v menu jsou také dvě tlačítka:
+  Import klientů  — nahrání nových firem ze souboru CSV
+  Export kontaktů — stažení všech kontaktních osob do CSV souboru (pro newsletter)
+
+
+--------------------------------------------------------------------------------
+PŘEHLED (Dashboard)
+--------------------------------------------------------------------------------
+
+Úvodní stránka zobrazuje:
+
+  - Celkový počet firem v databázi
+  - Celkový počet zaznamenaných kontaktů (schůzky, hovory, e-maily...)
+  - Počet nevyřízených reminderů (plánovaných úkolů)
+  - Posledních 10 zaznamenaných kontaktů s firmami
+  - Nejbližších 5 nadcházejících reminderů
+
+
+--------------------------------------------------------------------------------
+KLIENTI — SEZNAM
+--------------------------------------------------------------------------------
+
+Hlavní přehled všech firem. Zobrazuje tabulku s těmito sloupci:
+  Firma, Kategorie, Velikost, E-mail, Telefon, Kontaktů, tlačítko Detail
+
+FILTRY (nad tabulkou):
+  - Textové vyhledávání — hledá v názvu firmy, e-mailu
+  - Filtr Kategorie — zobrazí jen Hot / Neutrální / Cold firmy
+  - Filtr Velikost — zobrazí jen firmy dané velikosti
+
+ŘAZENÍ (kliknutím na záhlaví sloupce):
+  - Firma       → abecedně podle názvu
+  - Kategorie   → Hot → Neutrální → Cold → bez kategorie (výchozí řazení)
+  - Velikost    → od nejmenší po největší firmu
+  - Kontaktů    → od firmy s nejvíce zaznamenanou komunikací
+
+INLINE EDITACE KATEGORIE:
+  V sloupci "Kategorie" je přímo v řádku rozbalovací nabídka.
+  Změna se uloží okamžitě po výběru — bez nutnosti přecházet na detail firmy.
+
+
+--------------------------------------------------------------------------------
+KLIENT — DETAIL
+--------------------------------------------------------------------------------
+
+Stránka jedné firmy. Rozdělena do několika sekcí:
+
+  1. ZÁKLADNÍ INFORMACE
+     IČO, sídlo, velikost firmy, e-mail, telefon, web, poznámky.
+     Tlačítko "Načíst z ARES" — automaticky doplní adresu sídla a statutáře
+     z veřejného obchodního rejstříku podle IČO.
+     Tlačítko "O firmě" — přečte web firmy a shrne, čím se firma zabývá.
+
+  2. STATUTÁŘI
+     Jména a funkce osob, které firmu zastupují (jednatelé, předsedové
+     představenstva apod.). Načítá se automaticky z obchodního rejstříku
+     přes tlačítko "Načíst z ARES".
+
+  3. POBOČKY / PROVOZOVNY
+     Přehled míst, kde firma působí. Systém se pokusí tuto informaci
+     načíst z webu firmy automaticky.
+
+  4. O FIRMĚ
+     Stručný popis, čím se firma zabývá. Získává se scrapováním webu firmy
+     (tlačítko "O firmě" u pole Web).
+
+  5. KONTAKTNÍ OSOBY
+     Seznam lidí ve firmě, na které obchodník míří (HR manažeři, ředitelé...).
+     Každá osoba má: jméno, pozici, e-mail, telefon.
+     Tlačítko "Najít HR" — systém automaticky prohledá web firmy a pokusí se
+     najít HR kontakty (personalisty, HR manažery). Hledá na webu firmy,
+     v kariérní sekci, v sitemap, a jako zálohu použije i vyhledávač.
+
+  6. REMINDRY (plánované úkoly)
+     Připomínky vázané na tuto firmu — viz sekce Remindry níže.
+
+  7. HISTORIE KONTAKTŮ
+     Záznamy o veškeré komunikaci s firmou — viz sekce Interakce níže.
+
+
+--------------------------------------------------------------------------------
+FIRMY — KATEGORIE (Hot / Neutrální / Cold)
+--------------------------------------------------------------------------------
+
+Každé firmě lze přiřadit obchodní teplotní kategorii:
+
+  🔥 Hot       — firma je aktuálně aktivně oslovována, probíhá jednání
+  Neutrální    — firma je v databázi, ale zatím bez výraznější aktivity
+  ❄️ Cold      — firma nereaguje nebo zájem neprokázala
+
+Kategorie lze měnit:
+  a) Přímo v seznamu klientů (rozbalovací nabídka v každém řádku)
+  b) V editačním formuláři firmy
+
+Výchozí řazení seznamu je právě podle této kategorie (Hot nahoře).
+
+
+--------------------------------------------------------------------------------
+FIRMY — VELIKOST
+--------------------------------------------------------------------------------
+
+Firmám lze přiřadit velikost podle počtu zaměstnanců:
+
+  Freelancer    1 osoba
+  Mikro         2–9 zaměstnanců
+  Malá          10–49 zaměstnanců
+  Střední       50–249 zaměstnanců
+  Velká         250–999 zaměstnanců
+  Korporace     1 000 a více zaměstnanců
+
+Velikost se dá vyplnit ručně nebo ji systém pokusí zjistit automaticky
+při načtení dat z ARES (z obchodního rejstříku).
+
+
+--------------------------------------------------------------------------------
+ARES — AUTOMATICKÉ NAČÍTÁNÍ FIREMNÍCH DAT
+--------------------------------------------------------------------------------
+
+Při zadání IČO a kliknutí na "Načíst z ARES" systém:
+
+  1. Dotáže se státního registru ARES (ares.gov.cz)
+     → Získá adresu sídla firmy
+
+  2. Přečte veřejný obchodní rejstřík (kurzy.cz)
+     → Získá jména a funkce statutárních zástupců
+     → Pokusí se zjistit velikost firmy (počet zaměstnanců)
+
+  3. Pokud má firma vyplněný web, pokusí se načíst i pobočky/provozovny
+     prohledáním webu firmy
+
+Tato funkce šetří čas — místo ručního dohledávání se data doplní stiskem tlačítka.
+
+
+--------------------------------------------------------------------------------
+NAČTENÍ POPISU FIRMY Z WEBU
+--------------------------------------------------------------------------------
+
+Pokud je u firmy vyplněný web, tlačítko "O firmě" (vedle adresy webu):
+  1. Stáhne úvodní stránku webu firmy
+  2. Přečte text a vytáhne relevantní popis (co firma dělá, čím se zabývá)
+  3. Uloží jako pole "O firmě" v detailu klienta
+
+Slouží k rychlému pochopení firmy bez nutnosti ji ručně procházet.
+
+
+--------------------------------------------------------------------------------
+AUTOMATICKÉ HLEDÁNÍ HR KONTAKTŮ
+--------------------------------------------------------------------------------
+
+Tlačítko "Najít HR" v detailu firmy (sekce Kontaktní osoby) spustí
+víceúrovňové hledání:
+
+  Fáze 1 — Prohledání webu firmy
+    Systém navštíví web firmy a prohledá až 15 stránek:
+    hlavní stránku, kariérní sekci, stránku kontaktů, tým,
+    stránky /hr, /people, /lide, /tym a sitemapu.
+    Na každé stránce hledá:
+      - strukturovaná data (schema.org Person)
+      - e-mailové adresy v HR kontextu (personalista, HR, nábor...)
+      - LinkedIn profily zaměstnanců
+
+  Fáze 2 — Vyhledávač (záloha)
+    Pokud web firmy nestačí, systém vyhledá ve vyhledávači
+    kombinaci názvu firmy + "HR personalista email" a zpracuje výsledky.
+
+  Fáze 3 — Generický e-mail (krajní záloha)
+    Pokud ani vyhledávač nic nenajde, přidá tipovaný e-mail
+    ve formátu hr@domena.cz jako kontakt k ručnímu ověření.
+
+Nalezené kontakty se automaticky přidají do sekce Kontaktní osoby.
+Duplikáty (stejný e-mail) se přeskočí.
+
+
+--------------------------------------------------------------------------------
+INTERAKCE (Historie kontaktů)
+--------------------------------------------------------------------------------
+
+Každý zaznamenaný kontakt s firmou je "interakce". Obsahuje:
+  - Datum a čas
+  - Kdo z týmu kontaktoval
+  - S kým ve firmě komunikoval (kontaktní osoba)
+  - Způsob komunikace: e-mail / telefon / osobně / video hovor
+  - Předmět a poznámky
+
+Interakce se zobrazují v detailu firmy (Historie kontaktů) a také
+na Přehledu (dashboard) jako "Poslední aktivity".
+
+Logická vazba: Interakce → patří firmě + patří členovi týmu
+               (volitelně) patří konkrétní kontaktní osobě
+
+
+--------------------------------------------------------------------------------
+REMINDRY (Plánované úkoly)
+--------------------------------------------------------------------------------
+
+Reminder je připomínka — "udělej tohle do tohoto data". Obsahuje:
+  - Název / popis úkolu
+  - Termín (datum + čas)
+  - Přiřazení konkrétnímu členovi týmu (volitelné)
+  - Poznámky
+  - Stav: nevyřízený / hotový
+
+Remindry jsou vázány vždy na konkrétní firmu.
+Pokud termín uplynul a reminder není označen jako hotový, zobrazí se
+červeně s nápisem "Po termínu".
+
+Reminder lze označit jako hotový kliknutím na ikonku kroužku v řádku.
+
+Remindry se zobrazují:
+  a) V detailu firmy (jen remindry té firmy)
+  b) Na stránce Remindry (všechny remindry ze všech firem)
+  c) Na Přehledu (dashboard) — nejbližších 5 nadcházejících
+
+Logická vazba: Reminder → patří firmě
+               (volitelně) přiřazen členovi týmu
+
+
+--------------------------------------------------------------------------------
+TÝM
+--------------------------------------------------------------------------------
+
+Seznam členů obchodního týmu. Každý člen má jméno a e-mail.
+Členové týmu se používají při:
+  - Zaznamenávání interakce (kdo kontaktoval firmu)
+  - Přiřazování reminderů (kdo má úkol splnit)
+
+Logická vazba: Člen týmu ← Interakce (kdo kontaktoval)
+               Člen týmu ← Reminder (komu je přiřazen)
+
+
+--------------------------------------------------------------------------------
+EXPORT KONTAKTŮ DO CSV
+--------------------------------------------------------------------------------
+
+Tlačítko "Export kontaktů" (v levém menu) stáhne CSV soubor se všemi
+kontaktními osobami z celé databáze. Soubor obsahuje:
+  Jméno, E-mail, Telefon, Pozice, Firma, IČO, Web firmy, Sídlo
+
+Soubor je kompatibilní s Excelem (kódování UTF-8 BOM, středníková oddělení).
+Slouží principalmente pro import do newsletterových nástrojů.
+
+Z detailu konkrétní firmy lze exportovat jen kontakty té firmy
+(tlačítko "CSV" v sekci Kontaktní osoby).
+
+
+--------------------------------------------------------------------------------
+IMPORT KLIENTŮ Z CSV
+--------------------------------------------------------------------------------
+
+Tlačítko "Import klientů" (v levém menu) otevře stránku pro hromadné
+nahrání firem ze souboru CSV.
+
+Podporované sloupce:
+  Název firmy (povinný), IČO, E-mail, Telefon, Web,
+  Kategorie (hot/neutral/cold), Velikost, Poznámky
+
+Šablonu s příkladem lze stáhnout přímo na stránce importu.
+
+Systém při importu:
+  - Přeskočí firmy, které už v databázi existují
+    (duplicita se detekuje podle IČO, nebo podle názvu pokud IČO chybí)
+  - Po dokončení zobrazí zprávu: kolik přidáno / přeskočeno / chyb
+
+
+--------------------------------------------------------------------------------
+LOGICKÉ VAZBY MEZI DATY (přehled)
+--------------------------------------------------------------------------------
+
+  FIRMA (Client)
+  │
+  ├── KONTAKTNÍ OSOBY (ContactPerson)
+  │     Lidé ve firmě, na které cílíme (HR, ředitelé...)
+  │
+  ├── INTERAKCE (Interaction)
+  │     Záznamy komunikace — kdo, kdy, jak, s kým, o čem
+  │     └── váže se na: Firma + Člen týmu + (volitelně) Kontaktní osoba
+  │
+  └── REMINDRY (Reminder)
+        Plánované úkoly k firmě
+        └── váže se na: Firma + (volitelně) Člen týmu
+
+  ČLEN TÝMU (TeamMember)
+  ├── je autorem Interakcí
+  └── je příjemcem Reminderů
+
+
+--------------------------------------------------------------------------------
+TECHNICKÉ INFORMACE (pro vývojáře)
+--------------------------------------------------------------------------------
+
+  Technologie:   Python / Flask, SQLAlchemy, SQLite, Bootstrap 5
+  Hosting:       Railway (auto-deploy z GitHubu při push do větve main)
+  Repozitář:     https://github.com/Usidlo/crm_v1
+  Databáze:      SQLite soubor crm.db (na Railway je ephemeral — resetuje se
+                 při novém deploymentu; pro produkci zvážit PostgreSQL)
+  Scraping:      BeautifulSoup4, requests
+  Veřejné API:   ARES (ares.gov.cz) pro data o firmách dle IČO
+
+================================================================================
