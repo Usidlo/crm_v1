@@ -2209,7 +2209,7 @@ def _send_email(to: str, subject: str, body_html: str):
         resp = requests.post(
             'https://api.resend.com/emails',
             headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
-            json={'from': 'Sales PD <onboarding@resend.dev>', 'to': [recipient],
+            json={'from': 'Sales PD <noreply@prolus.cz>', 'to': [recipient],
                   'subject': subject, 'html': body_html},
             timeout=15,
         )
