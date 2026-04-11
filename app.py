@@ -1,13 +1,16 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from apscheduler.schedulers.background import BackgroundScheduler
 import requests
 import os
 import re
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from bs4 import BeautifulSoup
 
 EMPLOYEE_CODE_TO_SIZE = {
@@ -283,6 +286,7 @@ class Reminder(db.Model):
     due_at = db.Column(db.DateTime, nullable=False)
     notes = db.Column(db.Text)
     done = db.Column(db.Boolean, default=False, nullable=False)
+    notified = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -2138,6 +2142,7 @@ with app.app_context():
             'ALTER TABLE client_news ADD COLUMN recommended_action VARCHAR(300)',
             'ALTER TABLE client_news ADD COLUMN contact_id INTEGER REFERENCES contact_person(id)',
             'ALTER TABLE client_news ADD COLUMN deal_id INTEGER REFERENCES deal(id)',
+            'ALTER TABLE reminder ADD COLUMN notified BOOLEAN DEFAULT 0',
         ]:
             try:
                 conn.execute(text(sql))
@@ -2155,10 +2160,126 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
 
+# ── E-mail helpers ───────────────────────────────────────────────────────────
+
+GMAIL_USER = os.environ.get('GMAIL_USER', '')
+GMAIL_PASS = os.environ.get('GMAIL_PASS', '')
+DEBUG_EMAIL = os.environ.get('DEBUG_EMAIL', '')   # pokud nastaveno, veškeré maily jdou sem
+
+
+def _send_email(to: str, subject: str, body_html: str):
+    """Odešle e-mail přes Gmail SMTP. Pokud DEBUG_EMAIL je nastaveno, přesměruje tam."""
+    if not GMAIL_USER or not GMAIL_PASS:
+        return  # e-mail není nakonfigurován
+    recipient = DEBUG_EMAIL if DEBUG_EMAIL else to
+    if not recipient:
+        return
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From']    = f'Sales PD <{GMAIL_USER}>'
+        msg['To']      = recipient
+        msg.attach(MIMEText(body_html, 'html', 'utf-8'))
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as s:
+            s.login(GMAIL_USER, GMAIL_PASS)
+            s.sendmail(GMAIL_USER, recipient, msg.as_string())
+    except Exception as e:
+        app.logger.error(f'[email] Chyba odesílání na {recipient}: {e}')
+
+
+def _reminder_notify():
+    """Pošle upozornění na remindry splatné za 0–60 minut, které ještě nebyly notifikovány."""
+    with app.app_context():
+        now = datetime.utcnow()
+        window_end = now + timedelta(hours=1)
+        reminders = Reminder.query.filter(
+            Reminder.done == False,
+            Reminder.notified == False,
+            Reminder.due_at >= now,
+            Reminder.due_at <= window_end,
+        ).all()
+        for r in reminders:
+            email = None
+            if r.assigned_member and r.assigned_member.email:
+                email = r.assigned_member.email
+            if not email:
+                continue
+            due_str = r.due_at.strftime('%d.%m.%Y %H:%M')
+            client_name = r.client.name if r.client else '—'
+            body = f"""
+<p>Ahoj,</p>
+<p>připomínáme reminder, který máš za méně než hodinu:</p>
+<table style="border-collapse:collapse;margin:16px 0">
+  <tr><td style="padding:4px 12px 4px 0;color:#666;font-weight:bold">Klient:</td><td>{client_name}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#666;font-weight:bold">Název:</td><td>{r.title}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#666;font-weight:bold">Termín:</td><td>{due_str}</td></tr>
+  {'<tr><td style="padding:4px 12px 4px 0;color:#666;font-weight:bold">Poznámka:</td><td>' + r.notes + '</td></tr>' if r.notes else ''}
+</table>
+<p style="color:#888;font-size:12px">— Sales PD</p>
+"""
+            _send_email(email, f'⏰ Reminder: {r.title} ({due_str})', body)
+            r.notified = True
+        db.session.commit()
+
+
+def _weekly_digest():
+    """Každé pondělí ráno pošle souhrn novinek z posledního týdne všem členům týmu."""
+    with app.app_context():
+        since = datetime.utcnow() - timedelta(days=7)
+        items = (ClientNews.query
+                 .filter(ClientNews.created_at >= since)
+                 .order_by(ClientNews.client_id, ClientNews.created_at.desc())
+                 .all())
+        if not items:
+            return
+        members = TeamMember.query.filter(TeamMember.email.isnot(None)).all()
+        if not members:
+            return
+
+        rows = ''
+        for item in items:
+            priority_color = {'high': '#dc3545', 'medium': '#fd7e14', 'low': '#6c757d'}.get(item.priority, '#6c757d')
+            rows += f"""
+<tr>
+  <td style="padding:6px 10px;border-bottom:1px solid #eee">{item.client.name}</td>
+  <td style="padding:6px 10px;border-bottom:1px solid #eee">{NEWS_LABELS.get(item.category, item.category)}</td>
+  <td style="padding:6px 10px;border-bottom:1px solid #eee">{item.title}</td>
+  <td style="padding:6px 10px;border-bottom:1px solid #eee;color:{priority_color};font-weight:bold">
+    {NEWS_PRIORITY_LABELS.get(item.priority, '')}
+  </td>
+</tr>"""
+
+        body = f"""
+<p>Ahoj,</p>
+<p>zde je přehled novinek z posledního týdne ({since.strftime('%d.%m.')} – {datetime.utcnow().strftime('%d.%m.%Y')}):</p>
+<table style="border-collapse:collapse;width:100%;font-size:14px">
+  <thead>
+    <tr style="background:#f5f7fa;color:#666;text-transform:uppercase;font-size:12px">
+      <th style="padding:8px 10px;text-align:left">Firma</th>
+      <th style="padding:8px 10px;text-align:left">Typ</th>
+      <th style="padding:8px 10px;text-align:left">Novinka</th>
+      <th style="padding:8px 10px;text-align:left">Priorita</th>
+    </tr>
+  </thead>
+  <tbody>{rows}</tbody>
+</table>
+<p style="margin-top:16px;color:#888;font-size:12px">— Sales PD</p>
+"""
+        count = len(items)
+        noun = 'novinka' if count == 1 else 'novinky' if count < 5 else 'novinek'
+        subject = f'\U0001f4f0 T\u00fddenn\u00ed p\u0159ehled novinek ({count} {noun})'
+        for m in members:
+            _send_email(m.email, subject, body)
+
+
 # ── APScheduler — týdenní refresh ────────────────────────────────────────────
 scheduler = BackgroundScheduler(daemon=True)
 scheduler.add_job(weekly_refresh_all, 'cron', day_of_week='sun', hour=2, minute=0,
                   id='weekly_refresh', replace_existing=True)
+scheduler.add_job(_reminder_notify, 'interval', minutes=15,
+                  id='reminder_notify', replace_existing=True)
+scheduler.add_job(_weekly_digest, 'cron', day_of_week='mon', hour=7, minute=0,
+                  id='weekly_digest', replace_existing=True)
 scheduler.start()
 
 if __name__ == '__main__':
