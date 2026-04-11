@@ -1581,12 +1581,15 @@ def test_email():
     if not recipient:
         flash('E-mail není nakonfigurován (chybí GMAIL_USER).', 'danger')
         return redirect(url_for('admin_users'))
-    _send_email(
+    sent_to, error = _send_email(
         recipient,
         'Sales PD — test e-mailu',
         '<p>Ahoj,</p><p>tento e-mail potvrzuje, že odesílání z aplikace <strong>Sales PD</strong> funguje správně.</p><p style="color:#888;font-size:12px">— Sales PD</p>'
     )
-    flash(f'Testovací e-mail odeslán na {recipient}.', 'success')
+    if error:
+        flash(f'Chyba odesílání: {error}', 'danger')
+    else:
+        flash(f'Testovací e-mail odeslán na {sent_to}.', 'success')
     return redirect(url_for('admin_users'))
 
 
@@ -2199,21 +2202,26 @@ def _send_email(to: str, subject: str, body_html: str):
     gmail_pass = os.environ.get('GMAIL_PASS', '')
     debug_email = os.environ.get('DEBUG_EMAIL', '')
     if not gmail_user or not gmail_pass:
-        return  # e-mail není nakonfigurován
+        return None, 'Chybí GMAIL_USER nebo GMAIL_PASS'
     recipient = debug_email if debug_email else to
     if not recipient:
-        return
+        return None, 'Chybí příjemce'
     try:
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
         msg['From']    = f'Sales PD <{gmail_user}>'
         msg['To']      = recipient
         msg.attach(MIMEText(body_html, 'html', 'utf-8'))
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as s:
+        with smtplib.SMTP('smtp.gmail.com', 587, timeout=15) as s:
+            s.ehlo()
+            s.starttls()
+            s.ehlo()
             s.login(gmail_user, gmail_pass)
             s.sendmail(gmail_user, recipient, msg.as_string())
+        return recipient, None
     except Exception as e:
         app.logger.error(f'[email] Chyba odesílání na {recipient}: {e}')
+        return None, str(e)
 
 
 def _reminder_notify():
