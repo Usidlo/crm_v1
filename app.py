@@ -1559,6 +1559,18 @@ def novinky_refresh():
     return redirect(url_for('novinky'))
 
 
+@app.route('/admin/email-debug')
+@admin_required
+def email_debug():
+    return {
+        'GMAIL_USER_set': bool(os.environ.get('GMAIL_USER')),
+        'GMAIL_PASS_set': bool(os.environ.get('GMAIL_PASS')),
+        'DEBUG_EMAIL_set': bool(os.environ.get('DEBUG_EMAIL')),
+        'DEBUG_EMAIL_value': os.environ.get('DEBUG_EMAIL', ''),
+        'all_env_keys': [k for k in os.environ.keys() if 'GMAIL' in k or 'EMAIL' in k or 'DEBUG' in k],
+    }
+
+
 @app.route('/admin/test-email', methods=['POST'])
 @admin_required
 def test_email():
