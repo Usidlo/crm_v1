@@ -1563,7 +1563,9 @@ def novinky_refresh():
 @admin_required
 def test_email():
     """Odešle testovací e-mail pro ověření konfigurace (admin only)."""
-    recipient = DEBUG_EMAIL or GMAIL_USER
+    gmail_user = os.environ.get('GMAIL_USER', '')
+    debug_email = os.environ.get('DEBUG_EMAIL', '')
+    recipient = debug_email or gmail_user
     if not recipient:
         flash('E-mail není nakonfigurován (chybí GMAIL_USER).', 'danger')
         return redirect(url_for('admin_users'))
@@ -2179,16 +2181,14 @@ with app.app_context():
 
 # ── E-mail helpers ───────────────────────────────────────────────────────────
 
-GMAIL_USER = os.environ.get('GMAIL_USER', '')
-GMAIL_PASS = os.environ.get('GMAIL_PASS', '')
-DEBUG_EMAIL = os.environ.get('DEBUG_EMAIL', '')   # pokud nastaveno, veškeré maily jdou sem
-
-
 def _send_email(to: str, subject: str, body_html: str):
     """Odešle e-mail přes Gmail SMTP. Pokud DEBUG_EMAIL je nastaveno, přesměruje tam."""
-    if not GMAIL_USER or not GMAIL_PASS:
+    gmail_user = os.environ.get('GMAIL_USER', '')
+    gmail_pass = os.environ.get('GMAIL_PASS', '')
+    debug_email = os.environ.get('DEBUG_EMAIL', '')
+    if not gmail_user or not gmail_pass:
         return  # e-mail není nakonfigurován
-    recipient = DEBUG_EMAIL if DEBUG_EMAIL else to
+    recipient = debug_email if debug_email else to
     if not recipient:
         return
     try:
