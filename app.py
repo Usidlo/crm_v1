@@ -1559,6 +1559,23 @@ def novinky_refresh():
     return redirect(url_for('novinky'))
 
 
+@app.route('/admin/test-email', methods=['POST'])
+@admin_required
+def test_email():
+    """Odešle testovací e-mail pro ověření konfigurace (admin only)."""
+    recipient = DEBUG_EMAIL or GMAIL_USER
+    if not recipient:
+        flash('E-mail není nakonfigurován (chybí GMAIL_USER).', 'danger')
+        return redirect(url_for('admin_users'))
+    _send_email(
+        recipient,
+        'Sales PD — test e-mailu',
+        '<p>Ahoj,</p><p>tento e-mail potvrzuje, že odesílání z aplikace <strong>Sales PD</strong> funguje správně.</p><p style="color:#888;font-size:12px">— Sales PD</p>'
+    )
+    flash(f'Testovací e-mail odeslán na {recipient}.', 'success')
+    return redirect(url_for('admin_users'))
+
+
 # ── Routes: Export klientů ───────────────────────────────────────────────────
 
 @app.route('/export/clients')
