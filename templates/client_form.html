@@ -56,6 +56,19 @@
           </select>
         </div>
         <div class="col">
+          <label class="form-label fw-semibold">Kvalita velikosti</label>
+          <select name="size_quality" class="form-select">
+            <option value="">— neznámá —</option>
+            {% for key, label in size_quality_labels.items() %}
+            <option value="{{ key }}" {% if client and client.size_quality == key %}selected{% endif %}>
+              {{ label }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col">
           <label class="form-label fw-semibold">Kategorie</label>
           <select name="temperature" class="form-select">
             <option value="">— bez kategorie —</option>
@@ -66,6 +79,28 @@
             {% endfor %}
           </select>
         </div>
+        <div class="col">
+          <label class="form-label fw-semibold">Pipeline</label>
+          <select name="pipeline_status" class="form-select">
+            <option value="">— bez statusu —</option>
+            {% for key, label in pipeline_labels.items() %}
+            <option value="{{ key }}" {% if client and client.pipeline_status == key %}selected{% endif %}>
+              {{ label }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Vlastník</label>
+        <select name="owner_id" class="form-select">
+          <option value="">— bez vlastníka —</option>
+          {% for m in members %}
+          <option value="{{ m.id }}" {% if client and client.owner_id == m.id %}selected{% endif %}>
+            {{ m.name }}
+          </option>
+          {% endfor %}
+        </select>
       </div>
       <div class="mb-4">
         <label class="form-label fw-semibold">Poznámky</label>

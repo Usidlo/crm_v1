@@ -76,6 +76,18 @@
             <span class="badge bg-light text-dark border small">
               {{ news_labels.get(item.category, item.category) }}
             </span>
+            <!-- Priorita -->
+            {% if item.priority %}
+            <span class="badge bg-{{ news_priority_colors.get(item.priority, 'secondary') }}" style="font-size:.7rem">
+              {{ news_priority_labels.get(item.priority, item.priority) }}
+            </span>
+            {% endif %}
+            <!-- Akce vyžadována -->
+            {% if item.requires_action %}
+            <span class="badge bg-danger bg-opacity-75" style="font-size:.7rem">
+              <i class="bi bi-exclamation-circle me-1"></i>Vyžaduje akci
+            </span>
+            {% endif %}
             <!-- Čas -->
             <span class="text-muted small ms-auto">
               {{ item.created_at.strftime('%d.%m.%Y %H:%M') }}
@@ -85,9 +97,36 @@
           <!-- Název novinky -->
           <div class="{{ '' if item.is_read else 'fw-semibold' }}">{{ item.title }}</div>
 
+          <!-- Stará / nová hodnota -->
+          {% if item.old_value or item.new_value %}
+          <div class="mt-1 small d-flex gap-3 flex-wrap">
+            {% if item.old_value %}
+            <span class="text-muted"><s>{{ item.old_value }}</s></span>
+            {% endif %}
+            {% if item.new_value %}
+            <span class="text-success">→ {{ item.new_value }}</span>
+            {% endif %}
+          </div>
+          {% endif %}
+
           <!-- Detail -->
           {% if item.body %}
           <div class="text-muted small mt-1" style="white-space:pre-wrap">{{ item.body }}</div>
+          {% endif %}
+
+          <!-- Doporučená akce -->
+          {% if item.recommended_action %}
+          <div class="mt-2 small text-primary">
+            <i class="bi bi-lightbulb me-1"></i>{{ item.recommended_action }}
+          </div>
+          {% endif %}
+
+          <!-- Zdroj + důvěra -->
+          {% if item.source or item.confidence %}
+          <div class="mt-1 text-muted" style="font-size:.75rem">
+            {% if item.source %}<span>Zdroj: {{ item.source }}</span>{% endif %}
+            {% if item.confidence %}<span class="ms-2">Důvěra: {{ item.confidence }}</span>{% endif %}
+          </div>
           {% endif %}
         </div>
 

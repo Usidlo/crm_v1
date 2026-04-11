@@ -7,11 +7,21 @@
     <i class="bi bi-arrow-left"></i>
   </a>
   <div class="me-auto">
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
       <h2 class="fw-bold mb-0">{{ client.name }}</h2>
       {% if client.temperature %}
       <span class="badge bg-{{ temp_colors[client.temperature] }} fs-6">
         {{ temp_labels[client.temperature] }}
+      </span>
+      {% endif %}
+      {% if client.pipeline_status %}
+      <span class="badge bg-{{ pipeline_colors.get(client.pipeline_status, 'secondary') }}">
+        <i class="bi bi-funnel me-1"></i>{{ pipeline_labels.get(client.pipeline_status, client.pipeline_status) }}
+      </span>
+      {% endif %}
+      {% if client.owner %}
+      <span class="badge bg-light text-dark border">
+        <i class="bi bi-person me-1"></i>{{ client.owner.name }}
       </span>
       {% endif %}
     </div>
@@ -63,6 +73,11 @@
                   <span class="badge bg-{{ size_colors.get(client.size_category, 'secondary') }} text-dark">
                     {{ size_labels[client.size_category] }}
                   </span>
+                  {% if client.size_quality %}
+                  <span class="badge bg-{{ size_quality_colors.get(client.size_quality, 'secondary') }} ms-1" style="font-size:.7rem">
+                    {{ size_quality_labels.get(client.size_quality, '') }}
+                  </span>
+                  {% endif %}
                 {% else %}
                   <span class="text-muted fst-italic">nenačteno</span>
                 {% endif %}
@@ -179,9 +194,10 @@
           <thead class="table-light">
             <tr>
               <th>Jméno</th>
-              <th>Pozice</th>
+              <th>Pozice / Oblast</th>
               <th>E-mail</th>
               <th>Telefon</th>
+              <th>Kvalita</th>
               <th></th>
             </tr>
           </thead>
@@ -189,13 +205,34 @@
             {% for c in client.contacts %}
             <tr>
               <td class="fw-semibold small">{{ c.name }}</td>
-              <td class="small text-muted">{{ c.role or '—' }}</td>
+              <td class="small text-muted">
+                {{ c.role or '—' }}
+                {% if c.contact_role %}
+                <span class="badge bg-light text-dark border ms-1" style="font-size:.7rem">
+                  {{ contact_role_labels.get(c.contact_role, c.contact_role) }}
+                </span>
+                {% endif %}
+              </td>
               <td class="small">
                 {% if c.email %}
                 <a href="mailto:{{ c.email }}" class="text-decoration-none">{{ c.email }}</a>
+                {% if c.contact_type %}
+                <span class="badge bg-light text-dark border ms-1" style="font-size:.65rem">
+                  {{ contact_type_labels.get(c.contact_type, c.contact_type) }}
+                </span>
+                {% endif %}
                 {% else %}—{% endif %}
               </td>
               <td class="small">{{ c.phone or '—' }}</td>
+              <td class="small">
+                {% if c.trust_level %}
+                <span class="badge bg-{{ trust_level_colors.get(c.trust_level, 'secondary') }}" style="font-size:.7rem">
+                  {{ trust_level_labels.get(c.trust_level, c.trust_level) }}
+                </span>
+                {% else %}
+                <span class="text-muted">—</span>
+                {% endif %}
+              </td>
               <td class="text-end">
                 <a href="{{ url_for('edit_contact', id=c.id) }}"
                    class="btn btn-sm btn-outline-secondary" title="Upravit">
@@ -308,6 +345,61 @@
   </div>
 </div>
 
+<!-- Row 2b: Deals -->
+<div class="card mb-4">
+  <div class="card-header bg-white d-flex align-items-center py-3">
+    <span class="fw-semibold me-auto">
+      <i class="bi bi-briefcase me-2 text-muted"></i>Obchody
+      <span class="badge bg-light text-dark border ms-1">{{ deals | length }}</span>
+    </span>
+    <a href="{{ url_for('new_deal', client_id=client.id) }}" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-plus-lg me-1"></i>Přidat obchod
+    </a>
+  </div>
+  <div class="card-body p-0">
+    {% if deals %}
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Název</th>
+          <th>Status</th>
+          <th>Vlastník</th>
+          <th>Další krok</th>
+          <th>Vytvořen</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in deals %}
+        <tr>
+          <td class="fw-semibold small">{{ d.title }}</td>
+          <td>
+            <span class="badge bg-{{ pipeline_colors.get(d.status, 'secondary') }}">
+              {{ pipeline_labels.get(d.status, d.status) }}
+            </span>
+          </td>
+          <td class="small">{{ d.owner.name if d.owner else '—' }}</td>
+          <td class="small text-muted">{{ d.next_step or '—' }}</td>
+          <td class="small text-muted">{{ d.created_at.strftime('%d.%m.%Y') }}</td>
+          <td class="text-end">
+            <a href="{{ url_for('edit_deal', id=d.id) }}"
+               class="btn btn-sm btn-outline-secondary" title="Upravit">
+              <i class="bi bi-pencil"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted p-4 mb-0 small">
+      Žádné obchody.
+      <a href="{{ url_for('new_deal', client_id=client.id) }}">Přidat první obchod.</a>
+    </p>
+    {% endif %}
+  </div>
+</div>
+
 <!-- Row 3: Interaction history -->
 <div class="card">
   <div class="card-header bg-white d-flex align-items-center py-3">
@@ -372,5 +464,50 @@
     {% endif %}
   </div>
 </div>
+
+<!-- Audit log -->
+{% if audit_log %}
+<div class="card mt-4">
+  <div class="card-header bg-white py-2">
+    <span class="fw-semibold small">
+      <i class="bi bi-clock-history me-2 text-muted"></i>Historie změn (posledních 50)
+    </span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0 small">
+      <thead class="table-light">
+        <tr>
+          <th>Čas</th>
+          <th>Uživatel</th>
+          <th>Akce</th>
+          <th>Pole</th>
+          <th>Stará hodnota</th>
+          <th>Nová hodnota</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in audit_log %}
+        <tr>
+          <td class="text-muted text-nowrap">{{ a.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+          <td>{{ a.user.username if a.user else '—' }}</td>
+          <td>
+            <span class="badge bg-{{ 'success' if a.action == 'create' else ('warning' if a.action == 'update' else 'danger') }} bg-opacity-75">
+              {{ {'create':'Vytvoření','update':'Úprava','delete':'Smazání'}.get(a.action, a.action) }}
+            </span>
+          </td>
+          <td class="text-muted">{{ a.field_name or '—' }}</td>
+          <td class="text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ a.old_value or '—' }}
+          </td>
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ a.new_value or '—' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 
 {% endblock %}

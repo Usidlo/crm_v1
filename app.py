@@ -51,6 +51,76 @@ TEMP_COLORS = {
 
 TEMP_ORDER = {'hot': 0, 'neutral': 1, 'cold': 2, None: 3}
 
+PIPELINE_LABELS = {
+    'new_lead':    'Nový lead',
+    'ready':       'Připraveno',
+    'contacted':   'Osloveno',
+    'responded':   'Reagoval',
+    'negotiation': 'Jednání',
+    'offer':       'Nabídka',
+    'won':         'Vyhráno',
+    'lost':        'Prohráno',
+    'blacklist':   'Blacklist',
+}
+
+PIPELINE_COLORS = {
+    'new_lead':    'light',
+    'ready':       'info',
+    'contacted':   'primary',
+    'responded':   'warning',
+    'negotiation': 'warning',
+    'offer':       'success',
+    'won':         'success',
+    'lost':        'danger',
+    'blacklist':   'dark',
+}
+
+PIPELINE_ORDER = {k: i for i, k in enumerate(PIPELINE_LABELS)}
+
+SIZE_QUALITY_LABELS = {
+    'manual':        'Ručně potvrzeno',
+    'public_source': 'Veřejný zdroj',
+    'estimate':      'Odhad',
+}
+SIZE_QUALITY_COLORS = {
+    'manual':        'success',
+    'public_source': 'info',
+    'estimate':      'secondary',
+}
+
+CONTACT_TYPE_LABELS = {
+    'verified':        'Ověřený',
+    'unverified':      'Neověřený',
+    'generic_email':   'Generický email',
+    'estimated_email': 'Odhadnutý email',
+}
+CONTACT_TYPE_COLORS = {
+    'verified':        'success',
+    'unverified':      'secondary',
+    'generic_email':   'warning',
+    'estimated_email': 'warning',
+}
+
+CONTACT_ROLE_LABELS = {
+    'hr':         'HR',
+    'management': 'Management',
+    'other':      'Jiná',
+}
+
+TRUST_LEVEL_LABELS = {
+    'confirmed': 'Potvrzený',
+    'probable':  'Pravděpodobný',
+    'auto':      'Automatický odhad',
+}
+TRUST_LEVEL_COLORS = {
+    'confirmed': 'success',
+    'probable':  'warning',
+    'auto':      'secondary',
+}
+
+NEWS_PRIORITY_LABELS = {'high': 'Vysoká', 'medium': 'Střední', 'low': 'Nízká'}
+NEWS_PRIORITY_COLORS = {'high': 'danger', 'medium': 'warning', 'low': 'secondary'}
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'crm-secret-key-2024'
 
@@ -117,10 +187,18 @@ def inject_globals():
             'is_admin': session.get('is_admin', False),
         }
         unread_news_count = ClientNews.query.filter_by(is_read=False).count()
-    return dict(size_labels=SIZE_LABELS, size_colors=SIZE_COLORS,
-                temp_labels=TEMP_LABELS, temp_colors=TEMP_COLORS,
-                current_user=current_user,
-                unread_news_count=unread_news_count)
+    return dict(
+        size_labels=SIZE_LABELS, size_colors=SIZE_COLORS,
+        temp_labels=TEMP_LABELS, temp_colors=TEMP_COLORS,
+        pipeline_labels=PIPELINE_LABELS, pipeline_colors=PIPELINE_COLORS,
+        size_quality_labels=SIZE_QUALITY_LABELS, size_quality_colors=SIZE_QUALITY_COLORS,
+        contact_type_labels=CONTACT_TYPE_LABELS, contact_type_colors=CONTACT_TYPE_COLORS,
+        contact_role_labels=CONTACT_ROLE_LABELS,
+        trust_level_labels=TRUST_LEVEL_LABELS, trust_level_colors=TRUST_LEVEL_COLORS,
+        news_priority_labels=NEWS_PRIORITY_LABELS, news_priority_colors=NEWS_PRIORITY_COLORS,
+        current_user=current_user,
+        unread_news_count=unread_news_count,
+    )
 
 
 # ── Models ─────────────────────────────────────────────────────────────────
@@ -149,7 +227,10 @@ class Client(db.Model):
     statutory = db.Column(db.Text)
     branches = db.Column(db.Text)
     size_category     = db.Column(db.String(20))  # micro, small, medium, large
+    size_quality      = db.Column(db.String(20))  # manual, public_source, estimate
     temperature       = db.Column(db.String(10))  # hot, neutral, cold
+    pipeline_status   = db.Column(db.String(30))  # new_lead, ready, contacted, ...
+    owner_id          = db.Column(db.Integer, db.ForeignKey('team_member.id'), nullable=True)
     notes             = db.Column(db.Text)
     last_refreshed_at = db.Column(db.DateTime)
     created_at        = db.Column(db.DateTime, default=datetime.utcnow)
@@ -158,6 +239,7 @@ class Client(db.Model):
     reminders    = db.relationship('Reminder', backref='client', lazy=True, cascade='all, delete-orphan')
     news         = db.relationship('ClientNews', backref='client', lazy=True, cascade='all, delete-orphan',
                                    order_by='ClientNews.created_at.desc()')
+    owner        = db.relationship('TeamMember', foreign_keys=[owner_id], backref='owned_clients')
 
 
 class TeamMember(db.Model):
@@ -182,12 +264,15 @@ class Interaction(db.Model):
 
 
 class ContactPerson(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
-    name = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(200))
-    email = db.Column(db.String(200))
-    phone = db.Column(db.String(50))
+    id           = db.Column(db.Integer, primary_key=True)
+    client_id    = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
+    name         = db.Column(db.String(200), nullable=False)
+    role         = db.Column(db.String(200))
+    email        = db.Column(db.String(200))
+    phone        = db.Column(db.String(50))
+    contact_type = db.Column(db.String(30))   # verified, unverified, generic_email, estimated_email
+    contact_role = db.Column(db.String(20))   # hr, management, other
+    trust_level  = db.Column(db.String(20))   # confirmed, probable, auto
 
 
 class Reminder(db.Model):
@@ -202,13 +287,73 @@ class Reminder(db.Model):
 
 
 class ClientNews(db.Model):
-    id         = db.Column(db.Integer, primary_key=True)
-    client_id  = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
-    category   = db.Column(db.String(50))   # address, size, statutory, hr_contact, jobs
-    title      = db.Column(db.String(300), nullable=False)
-    body       = db.Column(db.Text)
-    is_read    = db.Column(db.Boolean, default=False, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    id                 = db.Column(db.Integer, primary_key=True)
+    client_id          = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
+    category           = db.Column(db.String(50))    # address, size, statutory, hr_contact, jobs
+    priority           = db.Column(db.String(10), default='medium')   # high, medium, low
+    title              = db.Column(db.String(300), nullable=False)
+    body               = db.Column(db.Text)
+    source             = db.Column(db.String(50))    # ares, kurzy_cz, website, hr_finder
+    old_value          = db.Column(db.Text)
+    new_value          = db.Column(db.Text)
+    confidence         = db.Column(db.String(10))    # high, medium, low
+    requires_action    = db.Column(db.Boolean, default=False)
+    recommended_action = db.Column(db.String(300))
+    contact_id         = db.Column(db.Integer, db.ForeignKey('contact_person.id'), nullable=True)
+    deal_id            = db.Column(db.Integer, db.ForeignKey('deal.id'), nullable=True)
+    is_read            = db.Column(db.Boolean, default=False, nullable=False)
+    created_at         = db.Column(db.DateTime, default=datetime.utcnow)
+    contact            = db.relationship('ContactPerson', backref='news_items')
+    deal               = db.relationship('Deal', backref='news_items')
+
+
+class Deal(db.Model):
+    id               = db.Column(db.Integer, primary_key=True)
+    client_id        = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
+    owner_id         = db.Column(db.Integer, db.ForeignKey('team_member.id'), nullable=True)
+    title            = db.Column(db.String(300), nullable=False)
+    status           = db.Column(db.String(30), default='new_lead')
+    notes            = db.Column(db.Text)
+    next_step        = db.Column(db.String(300))
+    last_activity_at = db.Column(db.DateTime)
+    created_at       = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at       = db.Column(db.DateTime, default=datetime.utcnow)
+    client           = db.relationship('Client', backref='deals')
+    owner            = db.relationship('TeamMember', backref='deals')
+
+
+class AuditLog(db.Model):
+    id          = db.Column(db.Integer, primary_key=True)
+    user_id     = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    entity_type = db.Column(db.String(50))   # client, contact, deal, reminder, user, team
+    entity_id   = db.Column(db.Integer)
+    action      = db.Column(db.String(20))   # create, update, delete
+    field_name  = db.Column(db.String(100))
+    old_value   = db.Column(db.Text)
+    new_value   = db.Column(db.Text)
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    user        = db.relationship('User', backref='audit_logs')
+
+
+# ── Audit log helper ────────────────────────────────────────────────────────
+
+def _audit(entity_type, entity_id, action, changes=None):
+    """Zaznamená změnu do audit logu.
+    changes = dict {field: (old_value, new_value)} nebo None pro create/delete."""
+    uid = session.get('user_id')
+    if changes:
+        for field, (old, new) in changes.items():
+            o, n = str(old or ''), str(new or '')
+            if o != n:
+                db.session.add(AuditLog(
+                    user_id=uid, entity_type=entity_type, entity_id=entity_id,
+                    action=action, field_name=field,
+                    old_value=o if o else None, new_value=n if n else None,
+                ))
+    else:
+        db.session.add(AuditLog(
+            user_id=uid, entity_type=entity_type, entity_id=entity_id, action=action,
+        ))
 
 
 # ── Routes: Dashboard ───────────────────────────────────────────────────────
@@ -240,10 +385,11 @@ def dashboard():
 @app.route('/clients')
 @login_required
 def clients():
-    q    = request.args.get('q', '').strip()
-    size = request.args.get('size', '').strip()
-    temp = request.args.get('temp', '').strip()
-    sort = request.args.get('sort', 'category')   # category | alpha | size | contacts
+    q        = request.args.get('q', '').strip()
+    size     = request.args.get('size', '').strip()
+    temp     = request.args.get('temp', '').strip()
+    pipeline = request.args.get('pipeline', '').strip()
+    sort     = request.args.get('sort', 'category')
     query = Client.query
     if q:
         query = query.filter(
@@ -255,6 +401,8 @@ def clients():
         query = query.filter(Client.size_category == size)
     if temp:
         query = query.filter(Client.temperature == temp)
+    if pipeline:
+        query = query.filter(Client.pipeline_status == pipeline)
     all_clients = query.all()
 
     SIZE_ORDER = {'freelancer': 0, 'micro': 1, 'small': 2,
@@ -265,19 +413,25 @@ def clients():
         all_clients.sort(key=lambda c: (SIZE_ORDER.get(c.size_category, 99), (c.name or '').lower()))
     elif sort == 'contacts':
         all_clients.sort(key=lambda c: (-len(c.interactions), (c.name or '').lower()))
+    elif sort == 'pipeline':
+        all_clients.sort(key=lambda c: (PIPELINE_ORDER.get(c.pipeline_status, 99), (c.name or '').lower()))
     else:  # category (default)
         all_clients.sort(key=lambda c: (TEMP_ORDER.get(c.temperature, 3), (c.name or '').lower()))
 
     return render_template('clients.html', clients=all_clients,
-                           q=q, size=size, temp=temp, sort=sort)
+                           q=q, size=size, temp=temp, pipeline=pipeline, sort=sort)
 
 
 @app.route('/clients/new', methods=['GET', 'POST'])
 @login_required
 def new_client():
+    members = TeamMember.query.order_by(TeamMember.name).all()
     if request.method == 'POST':
-        company = request.form.get('company', '').strip()
+        company  = request.form.get('company', '').strip()
         temp_val = request.form.get('temperature', '').strip()
+        pipe_val = request.form.get('pipeline_status', '').strip()
+        sq_val   = request.form.get('size_quality', '').strip()
+        owner_id = request.form.get('owner_id') or None
         client = Client(
             name=company,
             company=company,
@@ -287,12 +441,17 @@ def new_client():
             website=request.form.get('website', '').strip(),
             notes=request.form.get('notes', '').strip(),
             temperature=temp_val if temp_val in TEMP_LABELS else None,
+            pipeline_status=pipe_val if pipe_val in PIPELINE_LABELS else None,
+            size_quality=sq_val if sq_val in SIZE_QUALITY_LABELS else None,
+            owner_id=int(owner_id) if owner_id else None,
         )
         db.session.add(client)
+        db.session.flush()   # získej ID před audit logem
+        _audit('client', client.id, 'create')
         db.session.commit()
         flash(f'Klient „{client.name}" byl přidán.', 'success')
         return redirect(url_for('client_detail', id=client.id))
-    return render_template('client_form.html', client=None)
+    return render_template('client_form.html', client=None, members=members)
 
 
 @app.route('/clients/<int:id>')
@@ -305,10 +464,17 @@ def client_detail(id):
     reminders = (Reminder.query
                  .filter_by(client_id=id)
                  .order_by(Reminder.done, Reminder.due_at).all())
+    deals = (Deal.query.filter_by(client_id=id)
+             .order_by(Deal.updated_at.desc()).all())
+    audit_log = (AuditLog.query
+                 .filter(AuditLog.entity_type.in_(['client', 'contact', 'deal']),
+                         AuditLog.entity_id == id)
+                 .order_by(AuditLog.created_at.desc()).limit(50).all())
     members = TeamMember.query.order_by(TeamMember.name).all()
     now = datetime.utcnow()
     return render_template('client_detail.html', client=client,
                            interactions=interactions, reminders=reminders,
+                           deals=deals, audit_log=audit_log,
                            members=members, now=now)
 
 
@@ -316,26 +482,45 @@ def client_detail(id):
 @login_required
 def edit_client(id):
     client = Client.query.get_or_404(id)
+    members = TeamMember.query.order_by(TeamMember.name).all()
     if request.method == 'POST':
+        old = {
+            'company': client.company, 'ico': client.ico, 'email': client.email,
+            'phone': client.phone, 'website': client.website, 'notes': client.notes,
+            'size_category': client.size_category, 'size_quality': client.size_quality,
+            'temperature': client.temperature, 'pipeline_status': client.pipeline_status,
+            'owner_id': client.owner_id,
+        }
         company = request.form.get('company', '').strip()
         client.name = company
         client.company = company
-        client.ico = request.form.get('ico', '').strip()
-        client.email = request.form.get('email', '').strip()
-        client.phone = request.form.get('phone', '').strip()
+        client.ico     = request.form.get('ico', '').strip()
+        client.email   = request.form.get('email', '').strip()
+        client.phone   = request.form.get('phone', '').strip()
         client.website = request.form.get('website', '').strip()
-        client.notes = request.form.get('notes', '').strip()
+        client.notes   = request.form.get('notes', '').strip()
         size_val = request.form.get('size_category', '').strip()
-        if size_val in SIZE_LABELS:
-            client.size_category = size_val
-        elif size_val == '':
-            client.size_category = None
+        client.size_category = size_val if size_val in SIZE_LABELS else None
+        sq_val = request.form.get('size_quality', '').strip()
+        client.size_quality = sq_val if sq_val in SIZE_QUALITY_LABELS else None
         temp_val = request.form.get('temperature', '').strip()
         client.temperature = temp_val if temp_val in TEMP_LABELS else None
+        pipe_val = request.form.get('pipeline_status', '').strip()
+        client.pipeline_status = pipe_val if pipe_val in PIPELINE_LABELS else None
+        owner_id = request.form.get('owner_id') or None
+        client.owner_id = int(owner_id) if owner_id else None
+        new = {
+            'company': client.company, 'ico': client.ico, 'email': client.email,
+            'phone': client.phone, 'website': client.website, 'notes': client.notes,
+            'size_category': client.size_category, 'size_quality': client.size_quality,
+            'temperature': client.temperature, 'pipeline_status': client.pipeline_status,
+            'owner_id': client.owner_id,
+        }
+        _audit('client', client.id, 'update', {k: (old[k], new[k]) for k in old})
         db.session.commit()
         flash('Klient byl upraven.', 'success')
         return redirect(url_for('client_detail', id=client.id))
-    return render_template('client_form.html', client=client)
+    return render_template('client_form.html', client=client, members=members)
 
 
 @app.route('/clients/<int:id>/set-temperature', methods=['POST'])
@@ -1086,6 +1271,7 @@ def load_website(id):
 def delete_client(id):
     client = Client.query.get_or_404(id)
     name = client.name
+    _audit('client', id, 'delete')
     db.session.delete(client)
     db.session.commit()
     flash(f'Klient „{name}" byl smazán.', 'warning')
@@ -1099,14 +1285,22 @@ def delete_client(id):
 def new_contact(client_id):
     client = Client.query.get_or_404(client_id)
     if request.method == 'POST':
+        ct = request.form.get('contact_type', '').strip()
+        cr = request.form.get('contact_role', '').strip()
+        tl = request.form.get('trust_level', '').strip()
         contact = ContactPerson(
             client_id=client_id,
             name=request.form['name'].strip(),
             role=request.form.get('role', '').strip(),
             email=request.form.get('email', '').strip(),
             phone=request.form.get('phone', '').strip(),
+            contact_type=ct if ct in CONTACT_TYPE_LABELS else None,
+            contact_role=cr if cr in CONTACT_ROLE_LABELS else None,
+            trust_level=tl if tl in TRUST_LEVEL_LABELS else None,
         )
         db.session.add(contact)
+        db.session.flush()
+        _audit('contact', contact.id, 'create')
         db.session.commit()
         flash(f'Kontaktní osoba „{contact.name}" byla přidána.', 'success')
         return redirect(url_for('client_detail', id=client_id))
@@ -1118,10 +1312,20 @@ def new_contact(client_id):
 def edit_contact(id):
     contact = ContactPerson.query.get_or_404(id)
     if request.method == 'POST':
-        contact.name = request.form['name'].strip()
-        contact.role = request.form.get('role', '').strip()
+        old = {k: getattr(contact, k) for k in
+               ('name', 'role', 'email', 'phone', 'contact_type', 'contact_role', 'trust_level')}
+        contact.name  = request.form['name'].strip()
+        contact.role  = request.form.get('role', '').strip()
         contact.email = request.form.get('email', '').strip()
         contact.phone = request.form.get('phone', '').strip()
+        ct = request.form.get('contact_type', '').strip()
+        cr = request.form.get('contact_role', '').strip()
+        tl = request.form.get('trust_level', '').strip()
+        contact.contact_type = ct if ct in CONTACT_TYPE_LABELS else None
+        contact.contact_role = cr if cr in CONTACT_ROLE_LABELS else None
+        contact.trust_level  = tl if tl in TRUST_LEVEL_LABELS else None
+        new = {k: getattr(contact, k) for k in old}
+        _audit('contact', contact.id, 'update', {k: (old[k], new[k]) for k in old})
         db.session.commit()
         flash('Kontaktní osoba byla upravena.', 'success')
         return redirect(url_for('client_detail', id=contact.client_id))
@@ -1214,6 +1418,91 @@ def export_contacts():
     )
 
 
+# ── Routes: Obchody (Deals) ─────────────────────────────────────────────────
+
+@app.route('/deals')
+@login_required
+def deals():
+    status_filter = request.args.get('status', '').strip()
+    owner_filter  = request.args.get('owner', '').strip()
+    q = request.args.get('q', '').strip()
+    query = Deal.query.join(Client)
+    if status_filter:
+        query = query.filter(Deal.status == status_filter)
+    if owner_filter:
+        query = query.filter(Deal.owner_id == int(owner_filter))
+    if q:
+        query = query.filter(Client.name.ilike(f'%{q}%') | Deal.title.ilike(f'%{q}%'))
+    all_deals = query.order_by(Deal.updated_at.desc()).all()
+    members = TeamMember.query.order_by(TeamMember.name).all()
+    return render_template('deals.html', deals=all_deals, members=members,
+                           status_filter=status_filter, owner_filter=owner_filter, q=q)
+
+
+@app.route('/deals/new', methods=['GET', 'POST'])
+@login_required
+def new_deal():
+    client_id = request.args.get('client_id', type=int)
+    clients_list = Client.query.order_by(Client.name).all()
+    members = TeamMember.query.order_by(TeamMember.name).all()
+    if request.method == 'POST':
+        owner_id  = request.form.get('owner_id') or None
+        client_id = int(request.form['client_id'])
+        deal = Deal(
+            client_id=client_id,
+            title=request.form['title'].strip(),
+            status=request.form.get('status', 'new_lead'),
+            notes=request.form.get('notes', '').strip(),
+            next_step=request.form.get('next_step', '').strip(),
+            owner_id=int(owner_id) if owner_id else None,
+            last_activity_at=datetime.utcnow(),
+        )
+        db.session.add(deal)
+        db.session.flush()
+        _audit('deal', deal.id, 'create')
+        db.session.commit()
+        flash(f'Obchod „{deal.title}" byl přidán.', 'success')
+        return redirect(url_for('client_detail', id=client_id))
+    return render_template('deal_form.html', deal=None, clients=clients_list,
+                           members=members, preselected_client_id=client_id)
+
+
+@app.route('/deals/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_deal(id):
+    deal = Deal.query.get_or_404(id)
+    members = TeamMember.query.order_by(TeamMember.name).all()
+    if request.method == 'POST':
+        old = {k: getattr(deal, k) for k in ('title', 'status', 'notes', 'next_step', 'owner_id')}
+        deal.title     = request.form['title'].strip()
+        deal.status    = request.form.get('status', deal.status)
+        deal.notes     = request.form.get('notes', '').strip()
+        deal.next_step = request.form.get('next_step', '').strip()
+        owner_id = request.form.get('owner_id') or None
+        deal.owner_id  = int(owner_id) if owner_id else None
+        deal.updated_at = datetime.utcnow()
+        deal.last_activity_at = datetime.utcnow()
+        new = {k: getattr(deal, k) for k in old}
+        _audit('deal', deal.id, 'update', {k: (old[k], new[k]) for k in old})
+        db.session.commit()
+        flash('Obchod byl upraven.', 'success')
+        return redirect(url_for('client_detail', id=deal.client_id))
+    return render_template('deal_form.html', deal=deal, members=members,
+                           clients=None, preselected_client_id=deal.client_id)
+
+
+@app.route('/deals/<int:id>/delete', methods=['POST'])
+@login_required
+def delete_deal(id):
+    deal = Deal.query.get_or_404(id)
+    client_id = deal.client_id
+    _audit('deal', id, 'delete')
+    db.session.delete(deal)
+    db.session.commit()
+    flash('Obchod byl smazán.', 'warning')
+    return redirect(url_for('client_detail', id=client_id))
+
+
 # ── Routes: Novinky ─────────────────────────────────────────────────────────
 
 @app.route('/novinky')
@@ -1278,9 +1567,11 @@ def export_clients():
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow(['Název firmy', 'IČO', 'E-mail', 'Telefon', 'Web',
-                     'Kategorie', 'Velikost', 'Sídlo', 'Počet kontaktů',
-                     'Počet interakcí', 'Poznámky', 'Přidán'])
+                     'Kategorie', 'Velikost', 'Kvalita velikosti', 'Sídlo',
+                     'Pobočky', 'Pipeline', 'Vlastník', 'Statutáři',
+                     'Počet kontaktů', 'Poznámky', 'Přidán'])
     for c in clients:
+        owner_name = c.owner.name if c.owner else ''
         writer.writerow([
             c.company or c.name,
             c.ico or '',
@@ -1289,9 +1580,13 @@ def export_clients():
             c.website or '',
             TEMP_LABELS.get(c.temperature, '') if c.temperature else '',
             SIZE_LABELS.get(c.size_category, '') if c.size_category else '',
+            SIZE_QUALITY_LABELS.get(c.size_quality, '') if c.size_quality else '',
             c.address or '',
+            c.branches or '',
+            PIPELINE_LABELS.get(c.pipeline_status, '') if c.pipeline_status else '',
+            owner_name,
+            c.statutory or '',
             len(c.contacts),
-            len(c.interactions),
             c.notes or '',
             c.created_at.strftime('%d.%m.%Y'),
         ])
@@ -1631,7 +1926,10 @@ def _refresh_client_news(client):
                     if not _news_exists(client.id, 'address', title):
                         new_items.append(ClientNews(
                             client_id=client.id, category='address', title=title,
-                            body=f'Dříve: {client.address or "—"}\nNově: {new_addr}'))
+                            body=f'Dříve: {client.address or "—"}\nNově: {new_addr}',
+                            priority='low', source='ares', confidence='high',
+                            requires_action=False,
+                            old_value=client.address or '', new_value=new_addr))
                     client.address = new_addr
 
             # Statutáři + velikost z kurzy.cz
@@ -1641,7 +1939,10 @@ def _refresh_client_news(client):
                 if not _news_exists(client.id, 'statutory', title):
                     new_items.append(ClientNews(
                         client_id=client.id, category='statutory', title=title,
-                        body=statutory[:500]))
+                        body=statutory[:500],
+                        priority='medium', source='kurzy_cz', confidence='high',
+                        requires_action=False,
+                        old_value=client.statutory or '', new_value=statutory[:500]))
                 client.statutory = statutory
             if size and size != client.size_category:
                 old_label = SIZE_LABELS.get(client.size_category, client.size_category or '—')
@@ -1649,7 +1950,10 @@ def _refresh_client_news(client):
                 title = f'Změna velikosti: {old_label} → {new_label}'
                 if not _news_exists(client.id, 'size', title):
                     new_items.append(ClientNews(
-                        client_id=client.id, category='size', title=title))
+                        client_id=client.id, category='size', title=title,
+                        priority='medium', source='kurzy_cz', confidence='high',
+                        requires_action=False,
+                        old_value=old_label, new_value=new_label))
                 client.size_category = size
         except Exception:
             pass
@@ -1666,13 +1970,18 @@ def _refresh_client_news(client):
                 if not exists:
                     new_contact = ContactPerson(
                         client_id=client.id, name=c['name'],
-                        role=c['role'], email=c['email'])
+                        role=c['role'], email=c['email'],
+                        contact_type='estimated_email', contact_role='hr',
+                        trust_level='auto')
                     db.session.add(new_contact)
                     title = f'Nový HR kontakt: {c["name"]}'
                     if not _news_exists(client.id, 'hr_contact', title):
                         new_items.append(ClientNews(
                             client_id=client.id, category='hr_contact', title=title,
-                            body=f'{c["role"] or ""}\n{c["email"]}'))
+                            body=f'{c["role"] or ""}\n{c["email"]}',
+                            priority='high', source='hr_finder', confidence='medium',
+                            requires_action=True,
+                            recommended_action='Ověřit kontakt a oslovit'))
         except Exception:
             pass
 
@@ -1695,7 +2004,10 @@ def _refresh_client_news(client):
                             if not _news_exists(client.id, 'jobs', title):
                                 new_items.append(ClientNews(
                                     client_id=client.id, category='jobs', title=title,
-                                    body=f'Kariérní stránka: {career_url}'))
+                                    body=f'Kariérní stránka: {career_url}',
+                                    priority='high', source='website', confidence='medium',
+                                    requires_action=True,
+                                    recommended_action='Firma aktivně nabírá — vhodný čas na oslovení'))
         except Exception:
             pass
 
@@ -1811,6 +2123,21 @@ with app.app_context():
             'ALTER TABLE client ADD COLUMN temperature VARCHAR(10)',
             'ALTER TABLE client ADD COLUMN last_refreshed_at DATETIME',
             'ALTER TABLE user ADD COLUMN team_member_id INTEGER REFERENCES team_member(id)',
+            'ALTER TABLE client ADD COLUMN size_quality VARCHAR(20)',
+            'ALTER TABLE client ADD COLUMN pipeline_status VARCHAR(30)',
+            'ALTER TABLE client ADD COLUMN owner_id INTEGER REFERENCES team_member(id)',
+            'ALTER TABLE contact_person ADD COLUMN contact_type VARCHAR(30)',
+            'ALTER TABLE contact_person ADD COLUMN contact_role VARCHAR(20)',
+            'ALTER TABLE contact_person ADD COLUMN trust_level VARCHAR(20)',
+            'ALTER TABLE client_news ADD COLUMN priority VARCHAR(10)',
+            'ALTER TABLE client_news ADD COLUMN source VARCHAR(50)',
+            'ALTER TABLE client_news ADD COLUMN old_value TEXT',
+            'ALTER TABLE client_news ADD COLUMN new_value TEXT',
+            'ALTER TABLE client_news ADD COLUMN confidence VARCHAR(10)',
+            'ALTER TABLE client_news ADD COLUMN requires_action BOOLEAN',
+            'ALTER TABLE client_news ADD COLUMN recommended_action VARCHAR(300)',
+            'ALTER TABLE client_news ADD COLUMN contact_id INTEGER REFERENCES contact_person(id)',
+            'ALTER TABLE client_news ADD COLUMN deal_id INTEGER REFERENCES deal(id)',
         ]:
             try:
                 conn.execute(text(sql))

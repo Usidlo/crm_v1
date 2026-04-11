@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% block title %}{% if deal %}Upravit obchod{% else %}Nový obchod{% endif %} – Sales PD{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <a href="{{ url_for('deals') }}" class="btn btn-sm btn-outline-secondary me-3">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h2 class="fw-bold mb-0">
+    {% if deal %}Upravit obchod{% else %}Nový obchod{% endif %}
+  </h2>
+</div>
+
+<div class="card" style="max-width:600px">
+  <div class="card-body p-4">
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Název obchodu <span class="text-danger">*</span></label>
+        <input type="text" name="title" class="form-control"
+               value="{{ deal.title if deal else '' }}" required autofocus>
+      </div>
+      {% if clients %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Klient <span class="text-danger">*</span></label>
+        <select name="client_id" class="form-select" required>
+          <option value="">— vyberte klienta —</option>
+          {% for c in clients %}
+          <option value="{{ c.id }}"
+            {% if (deal and deal.client_id == c.id) or (preselected_client_id == c.id) %}selected{% endif %}>
+            {{ c.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="row g-3 mb-3">
+        <div class="col">
+          <label class="form-label fw-semibold">Status</label>
+          <select name="status" class="form-select">
+            {% for key, label in pipeline_labels.items() %}
+            <option value="{{ key }}" {% if (deal and deal.status == key) or (not deal and key == 'new_lead') %}selected{% endif %}>
+              {{ label }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col">
+          <label class="form-label fw-semibold">Vlastník</label>
+          <select name="owner_id" class="form-select">
+            <option value="">— bez vlastníka —</option>
+            {% for m in members %}
+            <option value="{{ m.id }}" {% if deal and deal.owner_id == m.id %}selected{% endif %}>
+              {{ m.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Další krok</label>
+        <input type="text" name="next_step" class="form-control"
+               value="{{ deal.next_step if deal and deal.next_step else '' }}"
+               placeholder="Co se má stát dál?">
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Poznámky</label>
+        <textarea name="notes" class="form-control" rows="3">{{ deal.notes if deal and deal.notes else '' }}</textarea>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i>Uložit
+        </button>
+        <a href="{{ url_for('deals') }}" class="btn btn-outline-secondary">Zrušit</a>
+        {% if deal %}
+        <form method="post" action="{{ url_for('delete_deal', id=deal.id) }}"
+              class="ms-auto"
+              onsubmit="return confirm('Opravdu smazat tento obchod?')">
+          <button type="submit" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash me-1"></i>Smazat
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

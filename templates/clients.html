@@ -19,10 +19,16 @@
       <option value="{{ key }}" {% if size == key %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
+    <select class="form-select" name="pipeline" style="width:155px">
+      <option value="">Všechny pipeline</option>
+      {% for key, label in pipeline_labels.items() %}
+      <option value="{{ key }}" {% if pipeline == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
     <button class="btn btn-outline-secondary btn-sm">
       <i class="bi bi-search"></i>
     </button>
-    {% if q or size or temp %}
+    {% if q or size or temp or pipeline %}
     <a href="{{ url_for('clients', sort=sort) }}" class="btn btn-outline-danger btn-sm" title="Zrušit filtry">
       <i class="bi bi-x-lg"></i>
     </a>
@@ -35,7 +41,7 @@
 
 {% macro sort_link(label, key) %}
   {% set icon = 'bi-sort-down' if sort == key else 'bi-arrow-down-up text-muted' %}
-  <a href="{{ url_for('clients', q=q, size=size, temp=temp, sort=key) }}"
+  <a href="{{ url_for('clients', q=q, size=size, temp=temp, pipeline=pipeline, sort=key) }}"
      class="text-decoration-none {{ 'fw-bold text-dark' if sort == key else 'text-muted' }}">
     {{ label }} <i class="bi {{ icon }} small"></i>
   </a>
@@ -50,8 +56,9 @@
           <th>{{ sort_link('Firma', 'alpha') }}</th>
           <th>{{ sort_link('Kategorie', 'category') }}</th>
           <th>{{ sort_link('Velikost', 'size') }}</th>
+          <th>{{ sort_link('Pipeline', 'pipeline') }}</th>
+          <th>Vlastník</th>
           <th>E-mail</th>
-          <th>Telefon</th>
           <th>{{ sort_link('Kontaktů', 'contacts') }}</th>
           <th></th>
         </tr>
@@ -89,13 +96,24 @@
             {% else %}—{% endif %}
           </td>
           <td>
+            {% if c.pipeline_status %}
+            <span class="badge bg-{{ pipeline_colors.get(c.pipeline_status, 'secondary') }}">
+              {{ pipeline_labels.get(c.pipeline_status, c.pipeline_status) }}
+            </span>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="small">
+            {% if c.owner %}
+            <span class="badge bg-light text-dark border">{{ c.owner.name }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td>
             {% if c.email %}
               <a href="mailto:{{ c.email }}" class="text-decoration-none text-muted small">{{ c.email }}</a>
             {% else %}—{% endif %}
           </td>
-          <td class="text-muted small">{{ c.phone or '—' }}</td>
           <td>
-            <span class="badge bg-light text-dark border">{{ c.interactions | length }}</span>
+            <span class="badge bg-light text-dark border">{{ c.contacts | length }}</span>
           </td>
           <td class="text-end">
             <a href="{{ url_for('client_detail', id=c.id) }}" class="btn btn-sm btn-outline-secondary">
@@ -108,7 +126,7 @@
     </table>
     {% else %}
     <p class="text-muted p-4 mb-0">
-      {% if q or size or temp %}Žádný klient neodpovídá zadaným filtrům.
+      {% if q or size or temp or pipeline %}Žádný klient neodpovídá zadaným filtrům.
       {% else %}Zatím žádní klienti. <a href="{{ url_for('new_client') }}">Přidat prvního klienta.</a>{% endif %}
     </p>
     {% endif %}

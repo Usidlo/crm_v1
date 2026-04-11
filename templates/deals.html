@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block title %}Obchody – Sales PD{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4 gap-3 flex-wrap">
+  <h2 class="fw-bold mb-0 me-auto">Obchody</h2>
+  <form class="d-flex gap-2 align-items-center flex-wrap" method="get">
+    <input class="form-control" name="q" value="{{ q }}" placeholder="Hledat…" style="width:160px">
+    <select class="form-select" name="status" style="width:155px">
+      <option value="">Všechny statusy</option>
+      {% for key, label in pipeline_labels.items() %}
+      <option value="{{ key }}" {% if status_filter == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select class="form-select" name="owner" style="width:155px">
+      <option value="">Všichni vlastníci</option>
+      {% for m in members %}
+      <option value="{{ m.id }}" {% if owner_filter == m.id|string %}selected{% endif %}>{{ m.name }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-search"></i></button>
+    {% if q or status_filter or owner_filter %}
+    <a href="{{ url_for('deals') }}" class="btn btn-outline-danger btn-sm" title="Zrušit filtry">
+      <i class="bi bi-x-lg"></i>
+    </a>
+    {% endif %}
+  </form>
+  <a href="{{ url_for('new_deal') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Nový obchod
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if deals %}
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Název</th>
+          <th>Klient</th>
+          <th>Status</th>
+          <th>Vlastník</th>
+          <th>Další krok</th>
+          <th>Aktualizován</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in deals %}
+        <tr>
+          <td class="fw-semibold small">{{ d.title }}</td>
+          <td class="small">
+            <a href="{{ url_for('client_detail', id=d.client.id) }}" class="text-decoration-none">
+              {{ d.client.name }}
+            </a>
+          </td>
+          <td>
+            <span class="badge bg-{{ pipeline_colors.get(d.status, 'secondary') }}">
+              {{ pipeline_labels.get(d.status, d.status) }}
+            </span>
+          </td>
+          <td class="small">{{ d.owner.name if d.owner else '—' }}</td>
+          <td class="small text-muted">{{ d.next_step or '—' }}</td>
+          <td class="small text-muted">{{ d.updated_at.strftime('%d.%m.%Y') }}</td>
+          <td class="text-end">
+            <a href="{{ url_for('edit_deal', id=d.id) }}" class="btn btn-sm btn-outline-secondary" title="Upravit">
+              <i class="bi bi-pencil"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted p-4 mb-0">
+      {% if q or status_filter or owner_filter %}Žádný obchod neodpovídá zadaným filtrům.
+      {% else %}Zatím žádné obchody. <a href="{{ url_for('new_deal') }}">Přidat první obchod.</a>{% endif %}
+    </p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

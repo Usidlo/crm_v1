@@ -26,7 +26,7 @@
                placeholder="např. obchodní ředitel"
                value="{{ contact.role if contact else '' }}">
       </div>
-      <div class="row g-3 mb-4">
+      <div class="row g-3 mb-3">
         <div class="col">
           <label class="form-label fw-semibold">E-mail</label>
           <input type="email" name="email" class="form-control"
@@ -37,6 +37,35 @@
           <input type="text" name="phone" class="form-control"
                  value="{{ contact.phone if contact else '' }}">
         </div>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col">
+          <label class="form-label fw-semibold">Typ kontaktu</label>
+          <select name="contact_type" class="form-select">
+            <option value="">— neznámý —</option>
+            {% for key, label in contact_type_labels.items() %}
+            <option value="{{ key }}" {% if contact and contact.contact_type == key %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col">
+          <label class="form-label fw-semibold">Oblast</label>
+          <select name="contact_role" class="form-select">
+            <option value="">— neznámá —</option>
+            {% for key, label in contact_role_labels.items() %}
+            <option value="{{ key }}" {% if contact and contact.contact_role == key %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Důvěryhodnost</label>
+        <select name="trust_level" class="form-select">
+          <option value="">— neznámá —</option>
+          {% for key, label in trust_level_labels.items() %}
+          <option value="{{ key }}" {% if contact and contact.trust_level == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary">
