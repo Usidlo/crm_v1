@@ -2222,14 +2222,15 @@ def _send_email(to: str, subject: str, body_html: str):
 
 
 def _reminder_notify():
-    """Pošle upozornění na remindry splatné za 0–60 minut, které ještě nebyly notifikovány."""
+    """Pošle upozornění na remindry splatné za 24–25 hodin, které ještě nebyly notifikovány."""
     with app.app_context():
         now = datetime.utcnow()
-        window_end = now + timedelta(hours=1)
+        window_start = now + timedelta(hours=24)
+        window_end   = now + timedelta(hours=25)
         reminders = Reminder.query.filter(
             Reminder.done == False,
             Reminder.notified == False,
-            Reminder.due_at >= now,
+            Reminder.due_at >= window_start,
             Reminder.due_at <= window_end,
         ).all()
         for r in reminders:
