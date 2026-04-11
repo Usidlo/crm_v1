@@ -375,12 +375,21 @@ def dashboard():
                 .filter_by(done=False)
                 .order_by(Reminder.due_at)
                 .limit(5).all())
+    recent_deals = (Deal.query
+                    .order_by(Deal.updated_at.desc())
+                    .limit(5).all())
+    recent_news = (ClientNews.query
+                   .filter_by(is_read=False)
+                   .order_by(ClientNews.created_at.desc())
+                   .limit(5).all())
     return render_template('dashboard.html',
                            clients_count=clients_count,
                            interactions_count=interactions_count,
                            pending_count=pending_count,
                            recent=recent,
                            upcoming=upcoming,
+                           recent_deals=recent_deals,
+                           recent_news=recent_news,
                            now=datetime.utcnow())
 
 
