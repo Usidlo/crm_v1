@@ -109,15 +109,32 @@
         {% if current_user.is_admin %}<span class="badge bg-danger ms-1" style="font-size:.65rem">admin</span>{% endif %}
       </div>
       {% endif %}
-      <a href="{{ url_for('import_clients') }}" class="btn btn-outline-primary btn-sm w-100">
-        <i class="bi bi-upload me-1"></i>Import klientů
-      </a>
-      <a href="{{ url_for('export_clients') }}" class="btn btn-outline-success btn-sm w-100">
-        <i class="bi bi-download me-1"></i>Export klientů
-      </a>
-      <a href="{{ url_for('export_contacts') }}" class="btn btn-outline-success btn-sm w-100">
-        <i class="bi bi-download me-1"></i>Export kontaktů
-      </a>
+      <div class="dropup w-100">
+        <button class="btn btn-outline-secondary btn-sm w-100 dropdown-toggle"
+                data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-arrow-down-up me-1"></i>Importy / Exporty
+        </button>
+        <ul class="dropdown-menu w-100">
+          <li><h6 class="dropdown-header">Import</h6></li>
+          <li>
+            <a class="dropdown-item small" href="{{ url_for('import_clients') }}">
+              <i class="bi bi-upload me-2 text-primary"></i>Import klientů
+            </a>
+          </li>
+          <li><hr class="dropdown-divider"></li>
+          <li><h6 class="dropdown-header">Export</h6></li>
+          <li>
+            <a class="dropdown-item small" href="{{ url_for('export_clients') }}">
+              <i class="bi bi-download me-2 text-success"></i>Export klientů
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item small" href="{{ url_for('export_contacts') }}">
+              <i class="bi bi-download me-2 text-success"></i>Export kontaktů
+            </a>
+          </li>
+        </ul>
+      </div>
       <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary btn-sm w-100">
         <i class="bi bi-box-arrow-right"></i> Odhlásit
       </a>
