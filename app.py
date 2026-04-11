@@ -4,6 +4,7 @@ from sqlalchemy import text
 from datetime import datetime
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
+from apscheduler.schedulers.background import BackgroundScheduler
 import requests
 import os
 import re
@@ -108,15 +109,18 @@ db = SQLAlchemy(app)
 @app.context_processor
 def inject_globals():
     current_user = None
+    unread_news_count = 0
     if session.get('user_id'):
         current_user = {
             'id':       session['user_id'],
             'username': session.get('username'),
             'is_admin': session.get('is_admin', False),
         }
+        unread_news_count = ClientNews.query.filter_by(is_read=False).count()
     return dict(size_labels=SIZE_LABELS, size_colors=SIZE_COLORS,
                 temp_labels=TEMP_LABELS, temp_colors=TEMP_COLORS,
-                current_user=current_user)
+                current_user=current_user,
+                unread_news_count=unread_news_count)
 
 
 # ── Models ─────────────────────────────────────────────────────────────────
@@ -144,13 +148,16 @@ class Client(db.Model):
     address = db.Column(db.String(500))
     statutory = db.Column(db.Text)
     branches = db.Column(db.Text)
-    size_category = db.Column(db.String(20))  # micro, small, medium, large
-    temperature = db.Column(db.String(10))    # hot, neutral, cold
-    notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    size_category     = db.Column(db.String(20))  # micro, small, medium, large
+    temperature       = db.Column(db.String(10))  # hot, neutral, cold
+    notes             = db.Column(db.Text)
+    last_refreshed_at = db.Column(db.DateTime)
+    created_at        = db.Column(db.DateTime, default=datetime.utcnow)
     interactions = db.relationship('Interaction', backref='client', lazy=True, cascade='all, delete-orphan')
-    contacts = db.relationship('ContactPerson', backref='client', lazy=True, cascade='all, delete-orphan')
-    reminders = db.relationship('Reminder', backref='client', lazy=True, cascade='all, delete-orphan')
+    contacts     = db.relationship('ContactPerson', backref='client', lazy=True, cascade='all, delete-orphan')
+    reminders    = db.relationship('Reminder', backref='client', lazy=True, cascade='all, delete-orphan')
+    news         = db.relationship('ClientNews', backref='client', lazy=True, cascade='all, delete-orphan',
+                                   order_by='ClientNews.created_at.desc()')
 
 
 class TeamMember(db.Model):
@@ -191,6 +198,16 @@ class Reminder(db.Model):
     due_at = db.Column(db.DateTime, nullable=False)
     notes = db.Column(db.Text)
     done = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ClientNews(db.Model):
+    id         = db.Column(db.Integer, primary_key=True)
+    client_id  = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
+    category   = db.Column(db.String(50))   # address, size, statutory, hr_contact, jobs
+    title      = db.Column(db.String(300), nullable=False)
+    body       = db.Column(db.Text)
+    is_read    = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -1197,6 +1214,94 @@ def export_contacts():
     )
 
 
+# ── Routes: Novinky ─────────────────────────────────────────────────────────
+
+@app.route('/novinky')
+@login_required
+def novinky():
+    client_filter = request.args.get('client_id', type=int)
+    show = request.args.get('show', 'unread')   # unread | all
+    query = ClientNews.query
+    if client_filter:
+        query = query.filter_by(client_id=client_filter)
+    if show == 'unread':
+        query = query.filter_by(is_read=False)
+    items = query.order_by(ClientNews.created_at.desc()).limit(200).all()
+    clients_with_news = (db.session.query(Client)
+                         .join(ClientNews, Client.id == ClientNews.client_id)
+                         .distinct().order_by(Client.name).all())
+    return render_template('novinky.html', items=items, show=show,
+                           client_filter=client_filter,
+                           clients_with_news=clients_with_news,
+                           news_icons=NEWS_ICONS, news_labels=NEWS_LABELS)
+
+
+@app.route('/novinky/mark-all-read', methods=['POST'])
+@login_required
+def novinky_mark_all_read():
+    ClientNews.query.filter_by(is_read=False).update({'is_read': True})
+    db.session.commit()
+    flash('Vše označeno jako přečtené.', 'success')
+    return redirect(url_for('novinky'))
+
+
+@app.route('/novinky/<int:id>/mark-read', methods=['POST'])
+@login_required
+def novinky_mark_read(id):
+    item = ClientNews.query.get_or_404(id)
+    item.is_read = True
+    db.session.commit()
+    return redirect(request.referrer or url_for('novinky'))
+
+
+@app.route('/novinky/refresh', methods=['POST'])
+@admin_required
+def novinky_refresh():
+    """Manuální spuštění aktualizace (admin only)."""
+    import threading
+    def run():
+        weekly_refresh_all()
+    threading.Thread(target=run, daemon=True).start()
+    flash('Aktualizace spuštěna na pozadí. Výsledky se objeví za několik minut.', 'info')
+    return redirect(url_for('novinky'))
+
+
+# ── Routes: Export klientů ───────────────────────────────────────────────────
+
+@app.route('/export/clients')
+@login_required
+def export_clients():
+    import csv
+    from io import StringIO
+    from flask import Response
+    clients = Client.query.order_by(Client.name).all()
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Název firmy', 'IČO', 'E-mail', 'Telefon', 'Web',
+                     'Kategorie', 'Velikost', 'Sídlo', 'Počet kontaktů',
+                     'Počet interakcí', 'Poznámky', 'Přidán'])
+    for c in clients:
+        writer.writerow([
+            c.company or c.name,
+            c.ico or '',
+            c.email or '',
+            c.phone or '',
+            c.website or '',
+            TEMP_LABELS.get(c.temperature, '') if c.temperature else '',
+            SIZE_LABELS.get(c.size_category, '') if c.size_category else '',
+            c.address or '',
+            len(c.contacts),
+            len(c.interactions),
+            c.notes or '',
+            c.created_at.strftime('%d.%m.%Y'),
+        ])
+    return Response(
+        '\ufeff' + output.getvalue(),
+        mimetype='text/csv; charset=utf-8',
+        headers={'Content-Disposition': 'attachment; filename=klienti.csv'}
+    )
+
+
 # ── Routes: Import klientů ──────────────────────────────────────────────────
 
 @app.route('/import/clients', methods=['GET', 'POST'])
@@ -1476,6 +1581,144 @@ def delete_member(id):
     return redirect(url_for('team'))
 
 
+# ── Automatická aktualizace klientů ─────────────────────────────────────────
+
+NEWS_ICONS = {
+    'address':    'bi-geo-alt',
+    'size':       'bi-bar-chart',
+    'statutory':  'bi-person-check',
+    'hr_contact': 'bi-person-plus',
+    'jobs':       'bi-briefcase',
+}
+
+NEWS_LABELS = {
+    'address':    'Změna adresy',
+    'size':       'Změna velikosti',
+    'statutory':  'Změna statutárů',
+    'hr_contact': 'Nový HR kontakt',
+    'jobs':       'Nabídky práce',
+}
+
+
+def _news_exists(client_id, category, title, days=7):
+    """Vrátí True pokud stejná novinka již existuje v posledních N dnech."""
+    from datetime import timedelta
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    return ClientNews.query.filter(
+        ClientNews.client_id == client_id,
+        ClientNews.category  == category,
+        ClientNews.title     == title,
+        ClientNews.created_at >= cutoff,
+    ).first() is not None
+
+
+def _refresh_client_news(client):
+    """Porovná aktuální data klienta s čerstvě načtenými, vytvoří novinky o změnách."""
+    new_items = []
+
+    # ── 1. ARES ──────────────────────────────────────────────────────────────
+    if client.ico:
+        try:
+            ico = client.ico.strip()
+            resp = _fetch(f'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}',
+                          timeout=10)
+            if resp and resp.status_code == 200:
+                data = resp.json()
+                sidlo = data.get('sidlo') or {}
+                new_addr = sidlo.get('textovaAdresa', '').strip()
+                if new_addr and new_addr != (client.address or '').strip():
+                    title = 'Změna adresy sídla'
+                    if not _news_exists(client.id, 'address', title):
+                        new_items.append(ClientNews(
+                            client_id=client.id, category='address', title=title,
+                            body=f'Dříve: {client.address or "—"}\nNově: {new_addr}'))
+                    client.address = new_addr
+
+            # Statutáři + velikost z kurzy.cz
+            statutory, size = _scrape_statutory_and_size(ico)
+            if statutory and statutory.strip() != (client.statutory or '').strip():
+                title = 'Změna statutárních zástupců'
+                if not _news_exists(client.id, 'statutory', title):
+                    new_items.append(ClientNews(
+                        client_id=client.id, category='statutory', title=title,
+                        body=statutory[:500]))
+                client.statutory = statutory
+            if size and size != client.size_category:
+                old_label = SIZE_LABELS.get(client.size_category, client.size_category or '—')
+                new_label = SIZE_LABELS.get(size, size)
+                title = f'Změna velikosti: {old_label} → {new_label}'
+                if not _news_exists(client.id, 'size', title):
+                    new_items.append(ClientNews(
+                        client_id=client.id, category='size', title=title))
+                client.size_category = size
+        except Exception:
+            pass
+
+    # ── 2. Nové HR kontakty ───────────────────────────────────────────────────
+    if client.website:
+        try:
+            found = _find_hr_contacts(client.website, client.company or client.name)
+            for c in found:
+                if not c.get('email'):
+                    continue
+                exists = ContactPerson.query.filter_by(
+                    client_id=client.id, email=c['email']).first()
+                if not exists:
+                    new_contact = ContactPerson(
+                        client_id=client.id, name=c['name'],
+                        role=c['role'], email=c['email'])
+                    db.session.add(new_contact)
+                    title = f'Nový HR kontakt: {c["name"]}'
+                    if not _news_exists(client.id, 'hr_contact', title):
+                        new_items.append(ClientNews(
+                            client_id=client.id, category='hr_contact', title=title,
+                            body=f'{c["role"] or ""}\n{c["email"]}'))
+        except Exception:
+            pass
+
+    # ── 3. Nabídky práce (indikátor náboru) ──────────────────────────────────
+    if client.website:
+        try:
+            resp = _fetch(client.website, timeout=10)
+            if resp and resp.status_code == 200:
+                soup = BeautifulSoup(resp.content, 'html.parser')
+                career_url = _find_career_url(soup, client.website)
+                if career_url:
+                    cresp = _fetch(career_url, timeout=10)
+                    if cresp and cresp.status_code == 200:
+                        csoup = BeautifulSoup(cresp.content, 'html.parser')
+                        texts = [t.get_text(strip=True) for t in
+                                 csoup.find_all(['h2', 'h3', 'h4', 'li', 'a'])]
+                        job_count = sum(1 for t in texts if _looks_like_job(t))
+                        if job_count > 0:
+                            title = f'Aktivní nábor: {job_count} nabídek práce'
+                            if not _news_exists(client.id, 'jobs', title):
+                                new_items.append(ClientNews(
+                                    client_id=client.id, category='jobs', title=title,
+                                    body=f'Kariérní stránka: {career_url}'))
+        except Exception:
+            pass
+
+    client.last_refreshed_at = datetime.utcnow()
+    for item in new_items:
+        db.session.add(item)
+    return new_items
+
+
+def weekly_refresh_all():
+    """Spouštěno APSchedulerem každou neděli — aktualizuje data všech klientů."""
+    with app.app_context():
+        clients = Client.query.filter(
+            (Client.ico.isnot(None)) | (Client.website.isnot(None))
+        ).all()
+        for client in clients:
+            try:
+                _refresh_client_news(client)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
+
 # ── Routes: Admin — správa uživatelů ────────────────────────────────────────
 
 @app.route('/admin/users')
@@ -1566,6 +1809,7 @@ with app.app_context():
             'ALTER TABLE client ADD COLUMN branches TEXT',
             'ALTER TABLE client ADD COLUMN size_category VARCHAR(20)',
             'ALTER TABLE client ADD COLUMN temperature VARCHAR(10)',
+            'ALTER TABLE client ADD COLUMN last_refreshed_at DATETIME',
             'ALTER TABLE user ADD COLUMN team_member_id INTEGER REFERENCES team_member(id)',
         ]:
             try:
@@ -1583,6 +1827,12 @@ with app.app_context():
         )
         db.session.add(admin)
         db.session.commit()
+
+# ── APScheduler — týdenní refresh ────────────────────────────────────────────
+scheduler = BackgroundScheduler(daemon=True)
+scheduler.add_job(weekly_refresh_all, 'cron', day_of_week='sun', hour=2, minute=0,
+                  id='weekly_refresh', replace_existing=True)
+scheduler.start()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

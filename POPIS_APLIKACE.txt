@@ -3,7 +3,7 @@
   CRM systém pro obchodní tým
 ================================================================================
 
-Naposledy aktualizováno: 2026-04-10 (user management + propojení uživatelů s týmem)
+Naposledy aktualizováno: 2026-04-11 (novinky, export klientů, týdenní auto-refresh)
 
 --------------------------------------------------------------------------------
 CO APLIKACE DĚLÁ
@@ -73,6 +73,7 @@ V levé části obrazovky je vždy viditelné menu s těmito položkami:
 
 Dole v menu jsou také dvě tlačítka:
   Import klientů  — nahrání nových firem ze souboru CSV
+  Export klientů  — stažení všech firem do CSV souboru
   Export kontaktů — stažení všech kontaktních osob do CSV souboru (pro newsletter)
 
 
@@ -302,6 +303,32 @@ Logická vazba: Člen týmu ← Interakce (kdo kontaktoval)
 
 
 --------------------------------------------------------------------------------
+NOVINKY — AUTOMATICKÁ AKTUALIZACE KLIENTŮ
+--------------------------------------------------------------------------------
+
+Záložka "Novinky" v hlavním menu zobrazuje změny detekované u klientů.
+Červený badge ukazuje počet nepřečtených novinek.
+
+Co se automaticky sleduje (každou neděli v noci):
+  - Změna adresy sídla (z ARES)
+  - Změna velikosti firmy (z ARES / kurzy.cz)
+  - Změna statutárních zástupců (z obchodního rejstříku)
+  - Nový HR kontakt nalezený na webu firmy
+  - Aktivní nabídky práce na kariérní stránce firmy
+    (indikátor náboru = obchodní příležitost)
+
+Novinky lze filtrovat:
+  - Nepřečtené / Vše
+  - Podle konkrétní firmy
+
+Každou novinku lze označit jako přečtenou kliknutím na ✓,
+nebo vše najednou tlačítkem "Vše přečteno".
+
+Admin má navíc tlačítko "Aktualizovat nyní" pro manuální spuštění refresh.
+Refresh běží na pozadí (trvá několik minut dle počtu klientů).
+
+
+--------------------------------------------------------------------------------
 EXPORT KONTAKTŮ DO CSV
 --------------------------------------------------------------------------------
 
@@ -314,6 +341,15 @@ Slouží principalmente pro import do newsletterových nástrojů.
 
 Z detailu konkrétní firmy lze exportovat jen kontakty té firmy
 (tlačítko "CSV" v sekci Kontaktní osoby).
+
+
+--------------------------------------------------------------------------------
+EXPORT KLIENTŮ DO CSV
+--------------------------------------------------------------------------------
+
+Tlačítko "Export klientů" (v levém menu) stáhne CSV soubor se všemi firmami.
+Soubor obsahuje: Název, IČO, E-mail, Telefon, Web, Kategorie, Velikost,
+Sídlo, Počet kontaktů, Počet interakcí, Poznámky, Datum přidání.
 
 
 --------------------------------------------------------------------------------

@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block title %}Novinky – Sales PD{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4 gap-3 flex-wrap">
+  <h2 class="fw-bold mb-0 me-auto">
+    Novinky
+    {% if unread_news_count > 0 %}
+    <span class="badge bg-danger ms-2">{{ unread_news_count }}</span>
+    {% endif %}
+  </h2>
+
+  <div class="d-flex gap-2 flex-wrap">
+    <!-- Filtr přečteno/nepřečteno -->
+    <a href="{{ url_for('novinky', show='unread', client_id=client_filter or '') }}"
+       class="btn btn-sm {{ 'btn-primary' if show == 'unread' else 'btn-outline-secondary' }}">
+      Nepřečtené
+    </a>
+    <a href="{{ url_for('novinky', show='all', client_id=client_filter or '') }}"
+       class="btn btn-sm {{ 'btn-primary' if show == 'all' else 'btn-outline-secondary' }}">
+      Vše
+    </a>
+
+    <!-- Filtr podle klienta -->
+    {% if clients_with_news %}
+    <select class="form-select form-select-sm" style="width:180px"
+            onchange="window.location=this.value">
+      <option value="{{ url_for('novinky', show=show) }}">Všichni klienti</option>
+      {% for c in clients_with_news %}
+      <option value="{{ url_for('novinky', show=show, client_id=c.id) }}"
+              {% if client_filter == c.id %}selected{% endif %}>
+        {{ c.name }}
+      </option>
+      {% endfor %}
+    </select>
+    {% endif %}
+
+    <!-- Označit vše jako přečtené -->
+    {% if items and show == 'unread' %}
+    <form method="post" action="{{ url_for('novinky_mark_all_read') }}">
+      <button class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-check2-all me-1"></i>Vše přečteno
+      </button>
+    </form>
+    {% endif %}
+
+    <!-- Manuální refresh (admin) -->
+    {% if current_user and current_user.is_admin %}
+    <form method="post" action="{{ url_for('novinky_refresh') }}"
+          onsubmit="return confirm('Spustit aktualizaci všech klientů? Může trvat několik minut.')">
+      <button class="btn btn-sm btn-outline-info">
+        <i class="bi bi-arrow-clockwise me-1"></i>Aktualizovat nyní
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if items %}
+<div class="d-flex flex-column gap-3">
+  {% for item in items %}
+  <div class="card {{ '' if item.is_read else 'border-start border-primary border-3' }}">
+    <div class="card-body py-3">
+      <div class="d-flex align-items-start gap-3">
+        <!-- Ikona kategorie -->
+        <div class="text-{{ 'muted' if item.is_read else 'primary' }} pt-1" style="font-size:1.3rem">
+          <i class="bi {{ news_icons.get(item.category, 'bi-info-circle') }}"></i>
+        </div>
+
+        <div class="flex-grow-1">
+          <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+            <!-- Firma -->
+            <a href="{{ url_for('client_detail', id=item.client.id) }}"
+               class="fw-bold text-decoration-none">{{ item.client.name }}</a>
+            <!-- Kategorie badge -->
+            <span class="badge bg-light text-dark border small">
+              {{ news_labels.get(item.category, item.category) }}
+            </span>
+            <!-- Čas -->
+            <span class="text-muted small ms-auto">
+              {{ item.created_at.strftime('%d.%m.%Y %H:%M') }}
+            </span>
+          </div>
+
+          <!-- Název novinky -->
+          <div class="{{ '' if item.is_read else 'fw-semibold' }}">{{ item.title }}</div>
+
+          <!-- Detail -->
+          {% if item.body %}
+          <div class="text-muted small mt-1" style="white-space:pre-wrap">{{ item.body }}</div>
+          {% endif %}
+        </div>
+
+        <!-- Označit jako přečtené -->
+        {% if not item.is_read %}
+        <form method="post" action="{{ url_for('novinky_mark_read', id=item.id) }}">
+          <button class="btn btn-sm btn-outline-secondary border-0" title="Označit jako přečtené">
+            <i class="bi bi-check2"></i>
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-muted text-center py-5">
+    <i class="bi bi-bell-slash" style="font-size:2rem"></i>
+    <div class="mt-2">
+      {% if show == 'unread' %}
+        Žádné nepřečtené novinky.
+        <a href="{{ url_for('novinky', show='all') }}">Zobrazit vše.</a>
+      {% else %}
+        Zatím žádné novinky. Novinky se generují automaticky každou neděli,
+        nebo je lze spustit ručně tlačítkem "Aktualizovat nyní".
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
