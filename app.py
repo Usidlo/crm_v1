@@ -365,23 +365,52 @@ def _audit(entity_type, entity_id, action, changes=None):
 @app.route('/')
 @login_required
 def dashboard():
+    view = request.args.get('view', 'all')  # 'all' nebo 'mine'
+
+    # Zjisti team_member_id přihlášeného uživatele
+    user = User.query.get(session.get('user_id'))
+    my_member_id = user.team_member_id if user else None
+
     clients_count = Client.query.count()
     interactions_count = Interaction.query.count()
-    pending_count = Reminder.query.filter_by(done=False).count()
-    recent = (Interaction.query
-              .order_by(Interaction.date.desc())
-              .limit(10).all())
-    upcoming = (Reminder.query
-                .filter_by(done=False)
-                .order_by(Reminder.due_at)
-                .limit(5).all())
-    recent_deals = (Deal.query
-                    .order_by(Deal.updated_at.desc())
+
+    if view == 'mine' and my_member_id:
+        pending_count = Reminder.query.filter_by(done=False, member_id=my_member_id).count()
+        upcoming = (Reminder.query
+                    .filter_by(done=False, member_id=my_member_id)
+                    .order_by(Reminder.due_at)
                     .limit(5).all())
-    recent_news = (ClientNews.query
-                   .filter_by(is_read=False)
-                   .order_by(ClientNews.created_at.desc())
-                   .limit(5).all())
+        recent = (Interaction.query
+                  .filter_by(member_id=my_member_id)
+                  .order_by(Interaction.date.desc())
+                  .limit(10).all())
+        recent_deals = (Deal.query
+                        .filter_by(owner_id=my_member_id)
+                        .order_by(Deal.updated_at.desc())
+                        .limit(5).all())
+        my_client_ids = [c.id for c in Client.query.filter_by(owner_id=my_member_id).all()]
+        recent_news = (ClientNews.query
+                       .filter(ClientNews.is_read == False,
+                               ClientNews.client_id.in_(my_client_ids))
+                       .order_by(ClientNews.created_at.desc())
+                       .limit(5).all())
+    else:
+        pending_count = Reminder.query.filter_by(done=False).count()
+        upcoming = (Reminder.query
+                    .filter_by(done=False)
+                    .order_by(Reminder.due_at)
+                    .limit(5).all())
+        recent = (Interaction.query
+                  .order_by(Interaction.date.desc())
+                  .limit(10).all())
+        recent_deals = (Deal.query
+                        .order_by(Deal.updated_at.desc())
+                        .limit(5).all())
+        recent_news = (ClientNews.query
+                       .filter_by(is_read=False)
+                       .order_by(ClientNews.created_at.desc())
+                       .limit(5).all())
+
     return render_template('dashboard.html',
                            clients_count=clients_count,
                            interactions_count=interactions_count,
@@ -390,6 +419,8 @@ def dashboard():
                            upcoming=upcoming,
                            recent_deals=recent_deals,
                            recent_news=recent_news,
+                           view=view,
+                           has_member=bool(my_member_id),
                            now=datetime.utcnow())
 
 

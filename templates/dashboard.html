@@ -3,7 +3,19 @@
 {% block content %}
 
 <div class="d-flex align-items-center mb-4">
-  <h2 class="fw-bold mb-0">Přehled</h2>
+  <h2 class="fw-bold mb-0 me-auto">Přehled</h2>
+  {% if has_member %}
+  <div class="btn-group">
+    <a href="{{ url_for('dashboard', view='all') }}"
+       class="btn btn-sm {{ 'btn-secondary' if view == 'all' else 'btn-outline-secondary' }}">
+      Vše
+    </a>
+    <a href="{{ url_for('dashboard', view='mine') }}"
+       class="btn btn-sm {{ 'btn-secondary' if view == 'mine' else 'btn-outline-secondary' }}">
+      <i class="bi bi-person me-1"></i>Moje
+    </a>
+  </div>
+  {% endif %}
 </div>
 
 <!-- Statistiky -->
