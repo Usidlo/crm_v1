@@ -2206,12 +2206,12 @@ def _send_email(to: str, subject: str, body_html: str):
     try:
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
-        msg['From']    = f'Sales PD <{GMAIL_USER}>'
+        msg['From']    = f'Sales PD <{gmail_user}>'
         msg['To']      = recipient
         msg.attach(MIMEText(body_html, 'html', 'utf-8'))
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as s:
-            s.login(GMAIL_USER, GMAIL_PASS)
-            s.sendmail(GMAIL_USER, recipient, msg.as_string())
+            s.login(gmail_user, gmail_pass)
+            s.sendmail(gmail_user, recipient, msg.as_string())
     except Exception as e:
         app.logger.error(f'[email] Chyba odesílání na {recipient}: {e}')
 
