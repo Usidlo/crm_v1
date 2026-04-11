@@ -2197,28 +2197,25 @@ with app.app_context():
 # ── E-mail helpers ───────────────────────────────────────────────────────────
 
 def _send_email(to: str, subject: str, body_html: str):
-    """Odešle e-mail přes Gmail SMTP. Pokud DEBUG_EMAIL je nastaveno, přesměruje tam."""
-    gmail_user = os.environ.get('GMAIL_USER', '')
-    gmail_pass = os.environ.get('GMAIL_PASS', '')
+    """Odešle e-mail přes Resend API. Pokud DEBUG_EMAIL je nastaveno, přesměruje tam."""
+    api_key = os.environ.get('RESEND_API_KEY', '')
     debug_email = os.environ.get('DEBUG_EMAIL', '')
-    if not gmail_user or not gmail_pass:
-        return None, 'Chybí GMAIL_USER nebo GMAIL_PASS'
+    if not api_key:
+        return None, 'Chybí RESEND_API_KEY'
     recipient = debug_email if debug_email else to
     if not recipient:
         return None, 'Chybí příjemce'
     try:
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From']    = f'Sales PD <{gmail_user}>'
-        msg['To']      = recipient
-        msg.attach(MIMEText(body_html, 'html', 'utf-8'))
-        with smtplib.SMTP('smtp.gmail.com', 587, timeout=15) as s:
-            s.ehlo()
-            s.starttls()
-            s.ehlo()
-            s.login(gmail_user, gmail_pass)
-            s.sendmail(gmail_user, recipient, msg.as_string())
-        return recipient, None
+        resp = requests.post(
+            'https://api.resend.com/emails',
+            headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+            json={'from': 'Sales PD <onboarding@resend.dev>', 'to': [recipient],
+                  'subject': subject, 'html': body_html},
+            timeout=15,
+        )
+        if resp.status_code in (200, 201):
+            return recipient, None
+        return None, f'Resend API chyba {resp.status_code}: {resp.text}'
     except Exception as e:
         app.logger.error(f'[email] Chyba odesílání na {recipient}: {e}')
         return None, str(e)
