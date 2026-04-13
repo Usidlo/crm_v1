@@ -188,8 +188,11 @@
   <!-- Poslední kontakty -->
   <div class="col-lg-7">
     <div class="card h-100">
-      <div class="card-header bg-white fw-semibold py-3">
-        <i class="bi bi-clock-history me-2 text-muted"></i>Poslední kontakty
+      <div class="card-header bg-white d-flex align-items-center py-3">
+        <span class="fw-semibold me-auto">
+          <i class="bi bi-clock-history me-2 text-muted"></i>Poslední kontakty
+        </span>
+        <a href="{{ url_for('all_interactions') }}" class="btn btn-sm btn-outline-secondary">Vše</a>
       </div>
       <div class="card-body p-0">
         {% if recent %}

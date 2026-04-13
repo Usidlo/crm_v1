@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% block title %}Všechny kontakty – Sales PD{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4 gap-3 flex-wrap">
+  <h2 class="fw-bold mb-0 me-auto">Všechny kontakty</h2>
+  <form class="d-flex gap-2 align-items-center flex-wrap" method="get">
+    <input class="form-control" name="q" value="{{ q }}" placeholder="Hledat…" style="width:160px">
+    <select class="form-select" name="member" style="width:160px">
+      <option value="">Všichni obchodníci</option>
+      {% for m in members %}
+      <option value="{{ m.id }}" {% if member_id == m.id|string %}selected{% endif %}>{{ m.name }}</option>
+      {% endfor %}
+    </select>
+    <input type="date" class="form-control" name="date_from" value="{{ date_from }}" style="width:145px" title="Od">
+    <input type="date" class="form-control" name="date_to" value="{{ date_to }}" style="width:145px" title="Do">
+    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-search"></i></button>
+    {% if q or member_id or date_from or date_to %}
+    <a href="{{ url_for('all_interactions') }}" class="btn btn-outline-danger btn-sm" title="Zrušit filtry">
+      <i class="bi bi-x-lg"></i>
+    </a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if interactions %}
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Datum</th>
+          <th>Obchodník</th>
+          <th>Klient</th>
+          <th>Kontaktní osoba</th>
+          <th>Způsob</th>
+          <th>Předmět / Poznámka</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in interactions %}
+        <tr>
+          <td class="text-nowrap small">
+            {{ i.date.strftime('%d.%m.%Y') }}<br>
+            <span class="text-muted">{{ i.date.strftime('%H:%M') }}</span>
+          </td>
+          <td class="small fw-semibold">{{ i.member.name }}</td>
+          <td class="small">
+            <a href="{{ url_for('client_detail', id=i.client_id) }}" class="text-decoration-none fw-semibold">
+              {{ i.client.name }}
+            </a>
+          </td>
+          <td class="small">
+            {% if i.contact_person %}
+              {{ i.contact_person.name }}
+              {% if i.contact_person.role %}
+                <span class="text-muted">({{ i.contact_person.role }})</span>
+              {% endif %}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>{% include '_method_badge.html' %}</td>
+          <td class="small">
+            {% if i.subject %}<div class="fw-semibold">{{ i.subject }}</div>{% endif %}
+            {% if i.notes %}<div class="text-muted">{{ i.notes }}</div>{% endif %}
+            {% if not i.subject and not i.notes %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('edit_interaction', id=i.id) }}"
+               class="btn btn-sm btn-outline-secondary" title="Upravit">
+              <i class="bi bi-pencil"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted p-4 mb-0">Žádné kontakty neodpovídají zadaným filtrům.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

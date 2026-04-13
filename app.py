@@ -1844,6 +1844,41 @@ def delete_reminder(id):
 
 # ── Routes: Interactions ────────────────────────────────────────────────────
 
+@app.route('/interactions')
+@login_required
+def all_interactions():
+    q          = request.args.get('q', '').strip()
+    member_id  = request.args.get('member', '').strip()
+    date_from  = request.args.get('date_from', '').strip()
+    date_to    = request.args.get('date_to', '').strip()
+
+    query = Interaction.query.join(Client).join(TeamMember)
+    if q:
+        query = query.filter(
+            Client.name.ilike(f'%{q}%') |
+            Interaction.subject.ilike(f'%{q}%') |
+            Interaction.notes.ilike(f'%{q}%')
+        )
+    if member_id:
+        query = query.filter(Interaction.member_id == int(member_id))
+    if date_from:
+        try:
+            query = query.filter(Interaction.date >= datetime.strptime(date_from, '%Y-%m-%d'))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            query = query.filter(Interaction.date <= datetime.strptime(date_to, '%Y-%m-%d').replace(hour=23, minute=59))
+        except ValueError:
+            pass
+
+    interactions = query.order_by(Interaction.date.desc()).limit(200).all()
+    members = TeamMember.query.order_by(TeamMember.name).all()
+    return render_template('all_interactions.html', interactions=interactions,
+                           members=members, q=q, member_id=member_id,
+                           date_from=date_from, date_to=date_to)
+
+
 @app.route('/clients/<int:client_id>/interactions/new', methods=['GET', 'POST'])
 @login_required
 def new_interaction(client_id):
