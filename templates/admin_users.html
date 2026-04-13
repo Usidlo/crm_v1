@@ -2,9 +2,15 @@
 {% block title %}Správa uživatelů – Sales PD{% endblock %}
 {% block content %}
 
-<div class="d-flex align-items-center mb-4">
+<div class="d-flex align-items-center mb-4 gap-2 flex-wrap">
   <h2 class="fw-bold mb-0 me-auto">Správa uživatelů</h2>
-  <form method="post" action="{{ url_for('test_email') }}" class="me-2">
+  <a href="{{ url_for('admin_login_log') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-key me-1"></i>Log přihlášení
+  </a>
+  <a href="{{ url_for('admin_audit_log') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-clock-history me-1"></i>Audit log
+  </a>
+  <form method="post" action="{{ url_for('test_email') }}" class="mb-0">
     <button class="btn btn-outline-info btn-sm">
       <i class="bi bi-envelope me-1"></i>Test e-mailu
     </button>

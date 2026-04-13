@@ -164,6 +164,9 @@ def login():
             session['username']       = user.username
             session['is_admin']       = user.is_admin
             session['team_member_id'] = user.team_member_id
+            ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+            db.session.add(LoginLog(user_id=user.id, ip_address=ip))
+            db.session.commit()
             return redirect(url_for('dashboard'))
         error = 'Špatné jméno nebo heslo, nebo účet je deaktivován.'
     return render_template('login.html', error=error)
@@ -347,6 +350,15 @@ class AuditLog(db.Model):
     old_value   = db.Column(db.Text)
     new_value   = db.Column(db.Text)
     created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    user        = db.relationship('User', backref='audit_logs')
+
+
+class LoginLog(db.Model):
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    ip_address = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user       = db.relationship('User', backref='login_logs')
     user        = db.relationship('User', backref='audit_logs')
 
 
@@ -2175,6 +2187,79 @@ def weekly_refresh_all():
 def admin_users():
     users = User.query.order_by(User.username).all()
     return render_template('admin_users.html', users=users)
+
+
+@app.route('/admin/login-log')
+@admin_required
+def admin_login_log():
+    logs = (LoginLog.query
+            .order_by(LoginLog.created_at.desc())
+            .limit(200).all())
+    return render_template('admin_login_log.html', logs=logs)
+
+
+@app.route('/admin/audit-log')
+@admin_required
+def admin_audit_log():
+    entity_type = request.args.get('entity_type', '').strip()
+    user_id     = request.args.get('user_id', '').strip()
+    query = AuditLog.query
+    if entity_type:
+        query = query.filter_by(entity_type=entity_type)
+    if user_id:
+        query = query.filter_by(user_id=int(user_id))
+    logs  = query.order_by(AuditLog.created_at.desc()).limit(300).all()
+    users = User.query.order_by(User.username).all()
+    return render_template('admin_audit_log.html', logs=logs, users=users,
+                           entity_type=entity_type, user_id=user_id)
+
+
+@app.route('/report')
+@login_required
+def report():
+    period = request.args.get('period', 'month')  # week, month, quarter
+    now = datetime.utcnow()
+    if period == 'week':
+        since = now - timedelta(days=7)
+        label = 'Tento týden'
+    elif period == 'quarter':
+        since = now - timedelta(days=90)
+        label = 'Poslední čtvrtletí'
+    else:
+        since = now - timedelta(days=30)
+        label = 'Posledních 30 dní'
+
+    members = TeamMember.query.order_by(TeamMember.name).all()
+    stats = []
+    for m in members:
+        interactions = Interaction.query.filter(
+            Interaction.member_id == m.id,
+            Interaction.date >= since).count()
+        deals_active = Deal.query.filter(
+            Deal.owner_id == m.id,
+            Deal.status.notin_(['won', 'lost', 'blacklist'])).count()
+        deals_won = Deal.query.filter(
+            Deal.owner_id == m.id,
+            Deal.status == 'won',
+            Deal.updated_at >= since).count()
+        clients_added = Client.query.filter(
+            Client.owner_id == m.id,
+            Client.created_at >= since).count()
+        stats.append({
+            'member': m,
+            'interactions': interactions,
+            'deals_active': deals_active,
+            'deals_won': deals_won,
+            'clients_added': clients_added,
+        })
+
+    # Pipeline přehled
+    pipeline_counts = {}
+    for key in PIPELINE_LABELS:
+        pipeline_counts[key] = Deal.query.filter_by(status=key).count()
+
+    return render_template('report.html', stats=stats, period=period, label=label,
+                           pipeline_counts=pipeline_counts)
 
 
 @app.route('/admin/users/new', methods=['GET', 'POST'])

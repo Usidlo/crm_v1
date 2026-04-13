@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Audit log – Sales PD{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4 gap-3 flex-wrap">
+  <a href="{{ url_for('admin_users') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h2 class="fw-bold mb-0 me-auto">Audit log</h2>
+  <form class="d-flex gap-2" method="get">
+    <select name="entity_type" class="form-select form-select-sm" style="width:160px">
+      <option value="">Všechny typy</option>
+      {% for t in ['client','contact','deal','reminder','user','team'] %}
+      <option value="{{ t }}" {% if entity_type == t %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+    <select name="user_id" class="form-select form-select-sm" style="width:160px">
+      <option value="">Všichni uživatelé</option>
+      {% for u in users %}
+      <option value="{{ u.id }}" {% if user_id == u.id|string %}selected{% endif %}>{{ u.username }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-search"></i></button>
+    {% if entity_type or user_id %}
+    <a href="{{ url_for('admin_audit_log') }}" class="btn btn-outline-danger btn-sm"><i class="bi bi-x-lg"></i></a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if logs %}
+    <table class="table table-hover mb-0 align-middle small">
+      <thead class="table-light">
+        <tr>
+          <th>Čas</th>
+          <th>Uživatel</th>
+          <th>Typ</th>
+          <th>Akce</th>
+          <th>Pole</th>
+          <th>Stará hodnota</th>
+          <th>Nová hodnota</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in logs %}
+        <tr>
+          <td class="text-nowrap text-muted">{{ a.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+          <td class="fw-semibold">{{ a.user.username if a.user else '—' }}</td>
+          <td><span class="badge bg-light text-dark border">{{ a.entity_type }}</span></td>
+          <td>
+            <span class="badge bg-{{ 'success' if a.action == 'create' else ('warning' if a.action == 'update' else 'danger') }} bg-opacity-75">
+              {{ {'create':'Vytvoření','update':'Úprava','delete':'Smazání'}.get(a.action, a.action) }}
+            </span>
+          </td>
+          <td class="text-muted">{{ a.field_name or '—' }}</td>
+          <td class="text-muted" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.old_value or '—' }}</td>
+          <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.new_value or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted p-4 mb-0">Žádné záznamy.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

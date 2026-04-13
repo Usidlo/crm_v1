@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block title %}Report – Sales PD{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4 gap-3">
+  <h2 class="fw-bold mb-0 me-auto">Report <span class="text-muted fw-normal fs-5">— {{ label }}</span></h2>
+  <div class="btn-group">
+    <a href="{{ url_for('report', period='week') }}"
+       class="btn btn-sm {{ 'btn-secondary' if period == 'week' else 'btn-outline-secondary' }}">Týden</a>
+    <a href="{{ url_for('report', period='month') }}"
+       class="btn btn-sm {{ 'btn-secondary' if period == 'month' else 'btn-outline-secondary' }}">Měsíc</a>
+    <a href="{{ url_for('report', period='quarter') }}"
+       class="btn btn-sm {{ 'btn-secondary' if period == 'quarter' else 'btn-outline-secondary' }}">Čtvrtletí</a>
+  </div>
+</div>
+
+<!-- Karty obchodníků -->
+<div class="row g-3 mb-4">
+  {% for s in stats %}
+  <div class="col-sm-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="fw-bold mb-3">
+          <i class="bi bi-person-circle me-2 text-muted"></i>{{ s.member.name }}
+        </div>
+        <div class="row g-2 text-center">
+          <div class="col-6">
+            <div class="fs-3 fw-bold text-primary">{{ s.interactions }}</div>
+            <div class="text-muted small">Kontaktů</div>
+          </div>
+          <div class="col-6">
+            <div class="fs-3 fw-bold text-info">{{ s.deals_active }}</div>
+            <div class="text-muted small">Aktivních obchodů</div>
+          </div>
+          <div class="col-6">
+            <div class="fs-3 fw-bold text-success">{{ s.deals_won }}</div>
+            <div class="text-muted small">Vyhráno</div>
+          </div>
+          <div class="col-6">
+            <div class="fs-3 fw-bold text-secondary">{{ s.clients_added }}</div>
+            <div class="text-muted small">Nových klientů</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Souhrnná tabulka -->
+<div class="card mb-4">
+  <div class="card-header bg-white fw-semibold py-3">
+    <i class="bi bi-table me-2 text-muted"></i>Srovnání obchodníků
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Obchodník</th>
+          <th class="text-center">Kontaktů</th>
+          <th class="text-center">Aktivní obchody</th>
+          <th class="text-center">Vyhráno</th>
+          <th class="text-center">Noví klienti</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in stats | sort(attribute='interactions', reverse=true) %}
+        <tr>
+          <td class="fw-semibold">{{ s.member.name }}</td>
+          <td class="text-center">
+            <span class="badge bg-primary">{{ s.interactions }}</span>
+          </td>
+          <td class="text-center">
+            <span class="badge bg-info">{{ s.deals_active }}</span>
+          </td>
+          <td class="text-center">
+            <span class="badge bg-success">{{ s.deals_won }}</span>
+          </td>
+          <td class="text-center">
+            <span class="badge bg-secondary">{{ s.clients_added }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pipeline přehled -->
+<div class="card">
+  <div class="card-header bg-white fw-semibold py-3">
+    <i class="bi bi-funnel me-2 text-muted"></i>Pipeline — aktuální stav
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% for key, label in pipeline_labels.items() %}
+      {% set count = pipeline_counts.get(key, 0) %}
+      <div class="col-6 col-md-4 col-lg-3">
+        <div class="d-flex align-items-center gap-3 p-2 rounded border">
+          <span class="badge bg-{{ pipeline_colors.get(key, 'secondary') }} fs-6" style="min-width:2.5rem">
+            {{ count }}
+          </span>
+          <span class="small fw-semibold">{{ label }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}

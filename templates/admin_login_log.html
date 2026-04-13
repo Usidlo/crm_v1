@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Log přihlášení – Sales PD{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <a href="{{ url_for('admin_users') }}" class="btn btn-sm btn-outline-secondary me-3">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h2 class="fw-bold mb-0">Log přihlášení</h2>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if logs %}
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Čas</th>
+          <th>Uživatel</th>
+          <th>IP adresa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in logs %}
+        <tr>
+          <td class="text-nowrap small">{{ l.created_at.strftime('%d.%m.%Y %H:%M:%S') }}</td>
+          <td class="fw-semibold small">{{ l.user.username }}</td>
+          <td class="text-muted small">{{ l.ip_address or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted p-4 mb-0">Zatím žádná přihlášení.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
