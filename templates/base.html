@@ -114,40 +114,40 @@
 
     <hr class="border-secondary mx-3 my-2">
 
-    <ul class="nav flex-column px-1">
+    <ul class="nav flex-column px-1" id="sidebarNav">
       <li class="nav-item">
         <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
-           href="{{ url_for('dashboard') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
+           href="{{ url_for('dashboard') }}">
           <i class="bi bi-speedometer2"></i>Přehled
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link {% if 'client' in (request.endpoint or '') %}active{% endif %}"
-           href="{{ url_for('clients') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
+           href="{{ url_for('clients') }}">
           <i class="bi bi-people"></i>Klienti
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link {% if 'member' in (request.endpoint or '') or request.endpoint == 'team' %}active{% endif %}"
-           href="{{ url_for('team') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
+           href="{{ url_for('team') }}">
           <i class="bi bi-person-badge"></i>Tým
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link {% if 'deal' in (request.endpoint or '') %}active{% endif %}"
-           href="{{ url_for('deals') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
+           href="{{ url_for('deals') }}">
           <i class="bi bi-briefcase"></i>Obchody
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link {% if 'reminder' in (request.endpoint or '') %}active{% endif %}"
-           href="{{ url_for('all_reminders') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
+           href="{{ url_for('all_reminders') }}">
           <i class="bi bi-bell"></i>Remindry
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link {% if request.endpoint == 'novinky' %}active{% endif %}"
-           href="{{ url_for('novinky') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
+           href="{{ url_for('novinky') }}">
           <i class="bi bi-newspaper"></i>Novinky
           {% if unread_news_count > 0 %}
           <span class="badge bg-danger ms-1" style="font-size:.65rem">{{ unread_news_count }}</span>
@@ -156,14 +156,14 @@
       </li>
       <li class="nav-item">
         <a class="nav-link {% if request.endpoint == 'report' %}active{% endif %}"
-           href="{{ url_for('report') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
+           href="{{ url_for('report') }}">
           <i class="bi bi-bar-chart-line"></i>Report
         </a>
       </li>
       {% if current_user and current_user.is_admin %}
       <li class="nav-item">
         <a class="nav-link {% if 'admin' in (request.endpoint or '') %}active{% endif %}"
-           href="{{ url_for('admin_users') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
+           href="{{ url_for('admin_users') }}">
           <i class="bi bi-shield-lock"></i>Uživatelé
         </a>
       </li>
@@ -225,5 +225,15 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Zavřít sidebar na mobilu po kliknutí na odkaz
+  document.querySelectorAll('#sidebarNav .nav-link').forEach(function(link) {
+    link.addEventListener('click', function() {
+      var sidebarEl = document.getElementById('sidebar');
+      var offcanvas = bootstrap.Offcanvas.getInstance(sidebarEl);
+      if (offcanvas) offcanvas.hide();
+    });
+  });
+</script>
 </body>
 </html>
