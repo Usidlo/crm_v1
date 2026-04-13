@@ -62,6 +62,29 @@
                value="{{ deal.next_step if deal and deal.next_step else '' }}"
                placeholder="Co se má stát dál?">
       </div>
+      {% if client_contacts %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Kontaktní osoby</label>
+        <div class="border rounded p-2" style="max-height:180px;overflow-y:auto">
+          {% for c in client_contacts %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="contact_ids"
+                   value="{{ c.id }}" id="contact_{{ c.id }}"
+                   {% if deal and c in deal.contacts %}checked{% endif %}>
+            <label class="form-check-label small" for="contact_{{ c.id }}">
+              <span class="fw-semibold">{{ c.name }}</span>
+              {% if c.role %}<span class="text-muted"> — {{ c.role }}</span>{% endif %}
+              {% if c.contact_role %}
+              <span class="badge bg-light text-dark border ms-1" style="font-size:.65rem">
+                {{ contact_role_labels.get(c.contact_role, c.contact_role) }}
+              </span>
+              {% endif %}
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
       <div class="mb-4">
         <label class="form-label fw-semibold">Poznámky</label>
         <textarea name="notes" class="form-control" rows="3">{{ deal.notes if deal and deal.notes else '' }}</textarea>

@@ -364,6 +364,7 @@
           <th>Název</th>
           <th>Status</th>
           <th>Vlastník</th>
+          <th>Kontaktní osoby</th>
           <th>Další krok</th>
           <th>Vytvořen</th>
           <th></th>
@@ -379,6 +380,17 @@
             </span>
           </td>
           <td class="small">{{ d.owner.name if d.owner else '—' }}</td>
+          <td class="small">
+            {% if d.contacts %}
+              {% for c in d.contacts %}
+              <span class="badge bg-light text-dark border me-1" style="font-size:.7rem">
+                {{ c.name }}{% if c.role %} <span class="text-muted">({{ c.role }})</span>{% endif %}
+              </span>
+              {% endfor %}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
           <td class="small text-muted">{{ d.next_step or '—' }}</td>
           <td class="small text-muted">{{ d.created_at.strftime('%d.%m.%Y') }}</td>
           <td class="text-end">

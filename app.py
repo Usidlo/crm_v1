@@ -315,6 +315,12 @@ class ClientNews(db.Model):
     deal               = db.relationship('Deal', backref='news_items')
 
 
+deal_contact = db.Table('deal_contact',
+    db.Column('deal_id',    db.Integer, db.ForeignKey('deal.id'),           primary_key=True),
+    db.Column('contact_id', db.Integer, db.ForeignKey('contact_person.id'), primary_key=True),
+)
+
+
 class Deal(db.Model):
     id               = db.Column(db.Integer, primary_key=True)
     client_id        = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
@@ -328,6 +334,7 @@ class Deal(db.Model):
     updated_at       = db.Column(db.DateTime, default=datetime.utcnow)
     client           = db.relationship('Client', backref='deals')
     owner            = db.relationship('TeamMember', backref='deals')
+    contacts         = db.relationship('ContactPerson', secondary='deal_contact', backref='deals')
 
 
 class AuditLog(db.Model):
@@ -1507,12 +1514,20 @@ def new_deal():
         )
         db.session.add(deal)
         db.session.flush()
+        contact_ids = request.form.getlist('contact_ids')
+        deal.contacts = ContactPerson.query.filter(ContactPerson.id.in_(
+            [int(i) for i in contact_ids if i])).all()
         _audit('deal', deal.id, 'create')
         db.session.commit()
         flash(f'Obchod „{deal.title}" byl přidán.', 'success')
         return redirect(url_for('client_detail', id=client_id))
+    # Pro nový obchod s předvybraným klientem načti jeho kontakty
+    preselected_contacts = []
+    if client_id:
+        preselected_contacts = ContactPerson.query.filter_by(client_id=client_id).all()
     return render_template('deal_form.html', deal=None, clients=clients_list,
-                           members=members, preselected_client_id=client_id)
+                           members=members, preselected_client_id=client_id,
+                           client_contacts=preselected_contacts)
 
 
 @app.route('/deals/<int:id>/edit', methods=['GET', 'POST'])
@@ -1520,6 +1535,7 @@ def new_deal():
 def edit_deal(id):
     deal = Deal.query.get_or_404(id)
     members = TeamMember.query.order_by(TeamMember.name).all()
+    client_contacts = ContactPerson.query.filter_by(client_id=deal.client_id).all()
     if request.method == 'POST':
         old = {k: getattr(deal, k) for k in ('title', 'status', 'notes', 'next_step', 'owner_id')}
         deal.title     = request.form['title'].strip()
@@ -1530,13 +1546,17 @@ def edit_deal(id):
         deal.owner_id  = int(owner_id) if owner_id else None
         deal.updated_at = datetime.utcnow()
         deal.last_activity_at = datetime.utcnow()
+        contact_ids = request.form.getlist('contact_ids')
+        deal.contacts = ContactPerson.query.filter(ContactPerson.id.in_(
+            [int(i) for i in contact_ids if i])).all()
         new = {k: getattr(deal, k) for k in old}
         _audit('deal', deal.id, 'update', {k: (old[k], new[k]) for k in old})
         db.session.commit()
         flash('Obchod byl upraven.', 'success')
         return redirect(url_for('client_detail', id=deal.client_id))
     return render_template('deal_form.html', deal=deal, members=members,
-                           clients=None, preselected_client_id=deal.client_id)
+                           clients=None, preselected_client_id=deal.client_id,
+                           client_contacts=client_contacts)
 
 
 @app.route('/deals/<int:id>/delete', methods=['POST'])
