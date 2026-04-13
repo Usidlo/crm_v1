@@ -29,10 +29,11 @@
       <span class="text-muted small">({{ c.client.name }})</span>{% if not loop.last or nd_contacts|length > 4 %}, {% endif %}
     {% endfor %}
     {% if nd_contacts|length > 4 %}
-      <a class="text-decoration-none small" data-bs-toggle="collapse" href="#nd-rest" style="cursor:pointer">
-        Vše ({{ nd_contacts|length }})
-      </a>
-      <div class="collapse" id="nd-rest">
+      <button class="btn btn-sm btn-outline-warning py-0 ms-1"
+              type="button" data-bs-toggle="collapse" data-bs-target="#nd-rest">
+        Další ({{ nd_contacts|length - 4 }})
+      </button>
+      <div class="collapse mt-1" id="nd-rest">
         {% for c in nd_contacts[4:] %}
           <a href="{{ url_for('client_detail', id=c.client_id) }}" class="fw-semibold text-decoration-none">{{ c.name }}</a>
           <span class="text-muted small">({{ c.client.name }})</span>{% if not loop.last %}, {% endif %}
