@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}Clustery klientů – Sales PD{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <h2 class="fw-bold mb-0 me-auto">Clustery klientů</h2>
+  <a href="{{ url_for('new_cluster') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Nový cluster
+  </a>
+</div>
+
+{% if clusters %}
+<div class="row g-3">
+  {% for cl in clusters %}
+  <div class="col-sm-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-start gap-2 mb-2">
+          <span class="badge bg-{{ cl.color }} fs-6">{{ cl.name }}</span>
+          <span class="ms-auto text-muted small">{{ cl.clients | length }} klientů</span>
+        </div>
+        {% if cl.description %}
+        <p class="text-muted small mb-3">{{ cl.description }}</p>
+        {% endif %}
+        <div class="d-flex flex-wrap gap-1 mb-3">
+          {% for c in cl.clients[:6] %}
+          <a href="{{ url_for('client_detail', id=c.id) }}"
+             class="badge bg-light text-dark border text-decoration-none" style="font-size:.75rem">
+            {{ c.name }}
+          </a>
+          {% endfor %}
+          {% if cl.clients | length > 6 %}
+          <span class="badge bg-light text-muted border" style="font-size:.75rem">
+            +{{ cl.clients | length - 6 }} dalších
+          </span>
+          {% endif %}
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('cluster_detail', id=cl.id) }}" class="btn btn-sm btn-outline-secondary flex-grow-1">
+            <i class="bi bi-eye me-1"></i>Detail
+          </a>
+          <a href="{{ url_for('edit_cluster', id=cl.id) }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-pencil"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-collection fs-1 mb-3 d-block"></i>
+    <p class="mb-3">Zatím žádné clustery. Clustery umožňují seskupit klienty libovolně — např. podle oslovované služby.</p>
+    <a href="{{ url_for('new_cluster') }}" class="btn btn-primary">
+      <i class="bi bi-plus-lg me-1"></i>Vytvořit první cluster
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

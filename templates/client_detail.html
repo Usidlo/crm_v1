@@ -120,6 +120,56 @@
       </div>
     </div>
 
+    <!-- Clustery -->
+    <div class="card mb-3">
+      <div class="card-header bg-white d-flex align-items-center py-2">
+        <span class="fw-semibold small me-auto">
+          <i class="bi bi-collection me-2 text-muted"></i>Clustery
+        </span>
+        <button class="btn btn-sm btn-outline-secondary py-0 px-2"
+                data-bs-toggle="collapse" data-bs-target="#clusterPanel">
+          <i class="bi bi-pencil"></i>
+        </button>
+      </div>
+      <div class="card-body py-2">
+        {% if client.clusters %}
+        <div class="d-flex flex-wrap gap-1">
+          {% for cl in client.clusters %}
+          <a href="{{ url_for('cluster_detail', id=cl.id) }}"
+             class="badge bg-{{ cl.color }} text-decoration-none">{{ cl.name }}</a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <span class="text-muted small fst-italic">Nepřiřazeno do žádného clusteru.</span>
+        {% endif %}
+      </div>
+      <div class="collapse" id="clusterPanel">
+        <div class="card-body border-top pt-2 pb-3">
+          <form method="post" action="{{ url_for('client_set_clusters', id=client.id) }}">
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              {% for cl in all_clusters %}
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="cluster_ids"
+                       value="{{ cl.id }}" id="cc_{{ cl.id }}"
+                       {% if cl in client.clusters %}checked{% endif %}>
+                <label class="form-check-label small" for="cc_{{ cl.id }}">
+                  <span class="badge bg-{{ cl.color }}">{{ cl.name }}</span>
+                </label>
+              </div>
+              {% else %}
+              <span class="text-muted small">Žádné clustery. <a href="{{ url_for('new_cluster') }}">Vytvořit.</a></span>
+              {% endfor %}
+            </div>
+            {% if all_clusters %}
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-check-lg me-1"></i>Uložit
+            </button>
+            {% endif %}
+          </form>
+        </div>
+      </div>
+    </div>
+
     <!-- Statutáři -->
     <div class="card mb-3">
       <div class="card-header bg-white py-2">

@@ -495,6 +495,11 @@ deal_contact = db.Table('deal_contact',
     db.Column('contact_id', db.Integer, db.ForeignKey('contact_person.id'), primary_key=True),
 )
 
+client_cluster = db.Table('client_cluster',
+    db.Column('client_id',  db.Integer, db.ForeignKey('client.id'),  primary_key=True),
+    db.Column('cluster_id', db.Integer, db.ForeignKey('cluster.id'), primary_key=True),
+)
+
 
 class Deal(db.Model):
     id               = db.Column(db.Integer, primary_key=True)
@@ -510,6 +515,15 @@ class Deal(db.Model):
     client           = db.relationship('Client', backref='deals')
     owner            = db.relationship('TeamMember', backref='deals')
     contacts         = db.relationship('ContactPerson', secondary='deal_contact', backref='deals')
+
+
+class Cluster(db.Model):
+    id          = db.Column(db.Integer, primary_key=True)
+    name        = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    color       = db.Column(db.String(20), default='primary')
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    clients     = db.relationship('Client', secondary='client_cluster', backref='clusters')
 
 
 class AuditLog(db.Model):
@@ -628,11 +642,12 @@ def dashboard():
 @app.route('/clients')
 @login_required
 def clients():
-    q        = request.args.get('q', '').strip()
-    size     = request.args.get('size', '').strip()
-    temp     = request.args.get('temp', '').strip()
-    pipeline = request.args.get('pipeline', '').strip()
-    sort     = request.args.get('sort', 'category')
+    q          = request.args.get('q', '').strip()
+    size       = request.args.get('size', '').strip()
+    temp       = request.args.get('temp', '').strip()
+    pipeline   = request.args.get('pipeline', '').strip()
+    cluster_id = request.args.get('cluster', '').strip()
+    sort       = request.args.get('sort', 'category')
     query = Client.query
     if q:
         query = query.filter(
@@ -646,6 +661,8 @@ def clients():
         query = query.filter(Client.temperature == temp)
     if pipeline:
         query = query.filter(Client.pipeline_status == pipeline)
+    if cluster_id:
+        query = query.filter(Client.clusters.any(Cluster.id == int(cluster_id)))
     all_clients = query.all()
 
     SIZE_ORDER = {'freelancer': 0, 'micro': 1, 'small': 2,
@@ -661,8 +678,10 @@ def clients():
     else:  # category (default)
         all_clients.sort(key=lambda c: (TEMP_ORDER.get(c.temperature, 3), (c.name or '').lower()))
 
+    all_clusters = Cluster.query.order_by(Cluster.name).all()
     return render_template('clients.html', clients=all_clients,
-                           q=q, size=size, temp=temp, pipeline=pipeline, sort=sort)
+                           q=q, size=size, temp=temp, pipeline=pipeline,
+                           cluster_id=cluster_id, all_clusters=all_clusters, sort=sort)
 
 
 @app.route('/clients/new', methods=['GET', 'POST'])
@@ -714,11 +733,12 @@ def client_detail(id):
                          AuditLog.entity_id == id)
                  .order_by(AuditLog.created_at.desc()).limit(50).all())
     members = TeamMember.query.order_by(TeamMember.name).all()
+    all_clusters = Cluster.query.order_by(Cluster.name).all()
     now = now_prague()
     return render_template('client_detail.html', client=client,
                            interactions=interactions, reminders=reminders,
                            deals=deals, audit_log=audit_log,
-                           members=members, now=now)
+                           members=members, all_clusters=all_clusters, now=now)
 
 
 @app.route('/clients/<int:id>/edit', methods=['GET', 'POST'])
@@ -2759,6 +2779,101 @@ def _weekly_digest():
         subject = f'\U0001f4f0 T\u00fddenn\u00ed p\u0159ehled novinek ({count} {noun})'
         for m in members:
             _send_email(m.email, subject, body)
+
+
+# ── Routes: Clusters ────────────────────────────────────────────────────────
+
+CLUSTER_COLORS = ['primary', 'success', 'danger', 'warning', 'info', 'secondary',
+                  'dark', 'indigo', 'teal', 'orange']
+
+@app.route('/clusters')
+@login_required
+def clusters():
+    all_clusters = Cluster.query.order_by(Cluster.name).all()
+    return render_template('clusters.html', clusters=all_clusters)
+
+
+@app.route('/clusters/new', methods=['GET', 'POST'])
+@login_required
+def new_cluster():
+    if request.method == 'POST':
+        name  = request.form.get('name', '').strip()
+        desc  = request.form.get('description', '').strip()
+        color = request.form.get('color', 'primary').strip()
+        if not name:
+            flash('Název clusteru je povinný.', 'danger')
+            return redirect(url_for('new_cluster'))
+        cluster = Cluster(name=name, description=desc or None, color=color)
+        db.session.add(cluster)
+        db.session.commit()
+        flash(f'Cluster „{cluster.name}" byl vytvořen.', 'success')
+        return redirect(url_for('cluster_detail', id=cluster.id))
+    return render_template('cluster_form.html', cluster=None, colors=CLUSTER_COLORS)
+
+
+@app.route('/clusters/<int:id>')
+@login_required
+def cluster_detail(id):
+    cluster = Cluster.query.get_or_404(id)
+    # All clients for the assign-modal
+    all_clients = Client.query.order_by(Client.name).all()
+    return render_template('cluster_detail.html', cluster=cluster, all_clients=all_clients)
+
+
+@app.route('/clusters/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_cluster(id):
+    cluster = Cluster.query.get_or_404(id)
+    if request.method == 'POST':
+        name  = request.form.get('name', '').strip()
+        desc  = request.form.get('description', '').strip()
+        color = request.form.get('color', 'primary').strip()
+        if not name:
+            flash('Název clusteru je povinný.', 'danger')
+            return redirect(url_for('edit_cluster', id=id))
+        cluster.name        = name
+        cluster.description = desc or None
+        cluster.color       = color
+        db.session.commit()
+        flash(f'Cluster „{cluster.name}" byl uložen.', 'success')
+        return redirect(url_for('cluster_detail', id=cluster.id))
+    return render_template('cluster_form.html', cluster=cluster, colors=CLUSTER_COLORS)
+
+
+@app.route('/clusters/<int:id>/delete', methods=['POST'])
+@login_required
+def delete_cluster(id):
+    cluster = Cluster.query.get_or_404(id)
+    name = cluster.name
+    cluster.clients = []   # remove M2M links
+    db.session.delete(cluster)
+    db.session.commit()
+    flash(f'Cluster „{name}" byl smazán.', 'success')
+    return redirect(url_for('clusters'))
+
+
+@app.route('/clusters/<int:id>/set-clients', methods=['POST'])
+@login_required
+def cluster_set_clients(id):
+    """Uloží seznam klientů patřících do clusteru (z checkboxů)."""
+    cluster = Cluster.query.get_or_404(id)
+    selected_ids = request.form.getlist('client_ids', type=int)
+    cluster.clients = Client.query.filter(Client.id.in_(selected_ids)).all() if selected_ids else []
+    db.session.commit()
+    flash('Klienti v clusteru aktualizováni.', 'success')
+    return redirect(url_for('cluster_detail', id=id))
+
+
+@app.route('/clients/<int:id>/set-clusters', methods=['POST'])
+@login_required
+def client_set_clusters(id):
+    """Uloží clustery klienta (voláno z detailu klienta)."""
+    client = Client.query.get_or_404(id)
+    selected_ids = request.form.getlist('cluster_ids', type=int)
+    client.clusters = Cluster.query.filter(Cluster.id.in_(selected_ids)).all() if selected_ids else []
+    db.session.commit()
+    flash('Clustery klienta aktualizovány.', 'success')
+    return redirect(url_for('client_detail', id=id))
 
 
 # ── APScheduler — týdenní refresh ────────────────────────────────────────────

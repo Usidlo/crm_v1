@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% block title %}{{ cluster.name }} – Sales PD{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-start mb-4 gap-3">
+  <a href="{{ url_for('clusters') }}" class="btn btn-sm btn-outline-secondary mt-1">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div class="me-auto">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <h2 class="fw-bold mb-0">{{ cluster.name }}</h2>
+      <span class="badge bg-{{ cluster.color }}">{{ cluster.clients | length }} klientů</span>
+    </div>
+    {% if cluster.description %}
+    <div class="text-muted mt-1 small">{{ cluster.description }}</div>
+    {% endif %}
+  </div>
+  <a href="{{ url_for('edit_cluster', id=cluster.id) }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-pencil me-1"></i>Upravit
+  </a>
+</div>
+
+<!-- Přiřazení klientů -->
+<div class="card mb-4">
+  <div class="card-header bg-white d-flex align-items-center py-3">
+    <span class="fw-semibold me-auto">
+      <i class="bi bi-people me-2 text-muted"></i>Klienti v clusteru
+    </span>
+    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#assignPanel">
+      <i class="bi bi-pencil-square me-1"></i>Upravit výběr
+    </button>
+  </div>
+
+  <!-- Výběr klientů (collapsible) -->
+  <div class="collapse" id="assignPanel">
+    <div class="card-body border-bottom">
+      <form method="post" action="{{ url_for('cluster_set_clients', id=cluster.id) }}">
+        <div class="row g-2 mb-3" style="max-height:300px;overflow-y:auto">
+          {% for c in all_clients %}
+          <div class="col-sm-6 col-lg-4">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="client_ids"
+                     value="{{ c.id }}" id="cl_c_{{ c.id }}"
+                     {% if c in cluster.clients %}checked{% endif %}>
+              <label class="form-check-label small" for="cl_c_{{ c.id }}">{{ c.name }}</label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-check-lg me-1"></i>Uložit výběr
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Seznam přiřazených klientů -->
+  <div class="card-body p-0">
+    {% if cluster.clients %}
+    <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Firma</th>
+          <th>Kategorie</th>
+          <th>Pipeline</th>
+          <th>Vlastník</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in cluster.clients | sort(attribute='name') %}
+        <tr>
+          <td>
+            <a href="{{ url_for('client_detail', id=c.id) }}" class="text-decoration-none fw-semibold">
+              {{ c.name }}
+            </a>
+            {% if c.address %}<div class="text-muted small">{{ c.address }}</div>{% endif %}
+          </td>
+          <td>
+            {% if c.temperature %}
+            <span class="badge bg-{{ temp_colors.get(c.temperature, 'secondary') }}">
+              {{ temp_labels.get(c.temperature, c.temperature) }}
+            </span>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if c.pipeline_status %}
+            <span class="badge bg-{{ pipeline_colors.get(c.pipeline_status, 'secondary') }}">
+              {{ pipeline_labels.get(c.pipeline_status, c.pipeline_status) }}
+            </span>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="small">
+            {% if c.owner %}{{ c.owner.name }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('client_detail', id=c.id) }}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p class="text-muted p-4 mb-0 small">Žádní klienti. Klikněte na „Upravit výběr" a přidejte klienty.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

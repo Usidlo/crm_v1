@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Upravit cluster' if cluster else 'Nový cluster' }} – Sales PD{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4 gap-3">
+  <a href="{{ url_for('cluster_detail', id=cluster.id) if cluster else url_for('clusters') }}"
+     class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h2 class="fw-bold mb-0">{{ 'Upravit cluster' if cluster else 'Nový cluster' }}</h2>
+</div>
+
+<div class="card" style="max-width:560px">
+  <div class="card-body">
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Název <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" name="name"
+               value="{{ cluster.name if cluster else '' }}" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Popis</label>
+        <textarea class="form-control" name="description" rows="3">{{ cluster.description if cluster else '' }}</textarea>
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Barva</label>
+        <div class="d-flex flex-wrap gap-2">
+          {% set color_labels = {
+            'primary': 'Modrá', 'success': 'Zelená', 'danger': 'Červená',
+            'warning': 'Žlutá', 'info': 'Cyan', 'secondary': 'Šedá',
+            'dark': 'Tmavá', 'indigo': 'Indigo', 'teal': 'Teal', 'orange': 'Oranžová'
+          } %}
+          {% for c in colors %}
+          <label class="d-flex align-items-center gap-1" style="cursor:pointer">
+            <input type="radio" name="color" value="{{ c }}"
+                   {% if (cluster and cluster.color == c) or (not cluster and c == 'primary') %}checked{% endif %}
+                   class="d-none cluster-color-radio">
+            <span class="badge bg-{{ c }} px-3 py-2 cluster-color-badge"
+                  style="font-size:.85rem; opacity:{{ '1' if (cluster and cluster.color == c) or (not cluster and c == 'primary') else '0.4' }}">
+              {{ color_labels.get(c, c) }}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i>Uložit
+        </button>
+        <a href="{{ url_for('cluster_detail', id=cluster.id) if cluster else url_for('clusters') }}"
+           class="btn btn-outline-secondary">Zrušit</a>
+        {% if cluster %}
+        <form method="post" action="{{ url_for('delete_cluster', id=cluster.id) }}"
+              class="ms-auto"
+              onsubmit="return confirm('Opravdu smazat cluster „{{ cluster.name }}"? Klienti zůstanou zachováni.')">
+          <button type="submit" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash me-1"></i>Smazat
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.cluster-color-radio').forEach(function(radio) {
+  radio.addEventListener('change', function() {
+    document.querySelectorAll('.cluster-color-badge').forEach(function(b) {
+      b.style.opacity = '0.4';
+    });
+    this.nextElementSibling.style.opacity = '1';
+  });
+});
+</script>
+
+{% endblock %}

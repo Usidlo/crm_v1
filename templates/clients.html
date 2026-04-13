@@ -25,10 +25,18 @@
       <option value="{{ key }}" {% if pipeline == key %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
+    {% if all_clusters %}
+    <select class="form-select" name="cluster" style="width:155px">
+      <option value="">Všechny clustery</option>
+      {% for cl in all_clusters %}
+      <option value="{{ cl.id }}" {% if cluster_id == cl.id|string %}selected{% endif %}>{{ cl.name }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
     <button class="btn btn-outline-secondary btn-sm">
       <i class="bi bi-search"></i>
     </button>
-    {% if q or size or temp or pipeline %}
+    {% if q or size or temp or pipeline or cluster_id %}
     <a href="{{ url_for('clients', sort=sort) }}" class="btn btn-outline-danger btn-sm" title="Zrušit filtry">
       <i class="bi bi-x-lg"></i>
     </a>
@@ -58,6 +66,7 @@
           <th>{{ sort_link('Kategorie', 'category') }}</th>
           <th>{{ sort_link('Velikost', 'size') }}</th>
           <th>{{ sort_link('Pipeline', 'pipeline') }}</th>
+          <th>Clustery</th>
           <th>Vlastník</th>
           <th>E-mail</th>
           <th>{{ sort_link('Kontaktů', 'contacts') }}</th>
@@ -102,6 +111,13 @@
               {{ pipeline_labels.get(c.pipeline_status, c.pipeline_status) }}
             </span>
             {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td style="min-width:120px">
+            {% for cl in c.clusters %}
+            <a href="{{ url_for('clients', cluster=cl.id, sort=sort) }}"
+               class="badge bg-{{ cl.color }} text-decoration-none me-1 mb-1"
+               style="font-size:.68rem">{{ cl.name }}</a>
+            {% else %}<span class="text-muted small">—</span>{% endfor %}
           </td>
           <td class="small">
             {% if c.owner %}
