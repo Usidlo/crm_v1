@@ -162,6 +162,14 @@ def utc_to_prague(dt):
     return dt.replace(tzinfo=ZoneInfo('UTC')).astimezone(_PRAGUE).replace(tzinfo=None)
 
 
+_CZ_MONTHS_GEN = [
+    'ledna','února','března','dubna','května','června',
+    'července','srpna','září','října','listopadu','prosince',
+]
+
+def format_czech_date(dt):
+    return f"{dt.day}. {_CZ_MONTHS_GEN[dt.month - 1]}"
+
 def get_todays_nameday_name():
     """Vrátí jméno dnešního svátku (nebo prázdný řetězec)."""
     return NAME_DAYS.get(now_prague().strftime('%m-%d'), '')
@@ -621,6 +629,9 @@ def dashboard():
 
     nd_name = get_todays_nameday_name()
     nd_contacts = get_nameday_contacts(nd_name)
+    today = now_prague()
+    nd_date_str = format_czech_date(today)
+    nd_tomorrow_name = NAME_DAYS.get((today + timedelta(days=1)).strftime('%m-%d'), '')
 
     return render_template('dashboard.html',
                            clients_count=clients_count,
@@ -634,7 +645,9 @@ def dashboard():
                            has_member=bool(my_member_id),
                            now=now_prague(),
                            nd_name=nd_name,
-                           nd_contacts=nd_contacts)
+                           nd_contacts=nd_contacts,
+                           nd_date_str=nd_date_str,
+                           nd_tomorrow_name=nd_tomorrow_name)
 
 
 # ── Routes: Clients ─────────────────────────────────────────────────────────

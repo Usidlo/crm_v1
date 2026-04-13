@@ -23,7 +23,7 @@
 <div class="alert alert-warning d-flex align-items-center gap-3 mb-4 py-2 px-3" style="border-radius:12px">
   <span style="font-size:1.4rem">🎂</span>
   <div>
-    <strong>Dnes slaví {{ nd_name }}</strong> —
+    <strong>Dnes ({{ nd_date_str }}) slaví {{ nd_name }}</strong>{% if nd_tomorrow_name %} <span class="text-muted small fw-normal">(zítra: {{ nd_tomorrow_name }})</span>{% endif %} —
     {% for c in nd_contacts[:4] %}
       <a href="{{ url_for('client_detail', id=c.client_id) }}" class="fw-semibold text-decoration-none">{{ c.name }}</a>
       <span class="text-muted small">({{ c.client.name }})</span>{% if not loop.last or nd_contacts|length > 4 %}, {% endif %}
@@ -45,7 +45,7 @@
 {% elif nd_name %}
 <div class="alert alert-light d-flex align-items-center gap-2 mb-4 py-2 px-3" style="border-radius:12px; border:1px solid #dee2e6">
   <span>🗓️</span>
-  <span class="text-muted small">Dnes má svátek <strong>{{ nd_name }}</strong> — žádný shodný kontakt.</span>
+  <span class="text-muted small">Dnes ({{ nd_date_str }}) má svátek <strong>{{ nd_name }}</strong>{% if nd_tomorrow_name %} <span class="fw-normal">(zítra: {{ nd_tomorrow_name }})</span>{% endif %} — žádný shodný kontakt.</span>
 </div>
 {% endif %}
 
