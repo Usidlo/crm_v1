@@ -1,15 +1,20 @@
 <!DOCTYPE html>
-<html lang="cs">
+<html lang="cs" data-bs-theme="light" id="htmlRoot">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Sales PD{% endblock %}</title>
+  <!-- Aplikuj téma před načtením stránky, aby nedošlo k bliknutí -->
+  <script>
+    (function() {
+      var t = localStorage.getItem('theme') || 'light';
+      document.getElementById('htmlRoot').setAttribute('data-bs-theme', t);
+    })();
+  </script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <style>
-    body { background: #f5f7fa; }
-
-    /* ── Sidebar ── */
+    /* ── Sidebar (vždy tmavý bez ohledu na režim) ── */
     #sidebar {
       background: #1a2236;
       color: #cdd6f4;
@@ -36,6 +41,30 @@
       color: #fff;
     }
     #sidebar .nav-link i { margin-right: 8px; }
+    #sidebar .btn-outline-secondary {
+      color: #9ba8c5;
+      border-color: #3d4f6e;
+    }
+    #sidebar .btn-outline-secondary:hover {
+      background: #2d3a57;
+      color: #fff;
+      border-color: #3d4f6e;
+    }
+    #sidebar .text-secondary { color: #9ba8c5 !important; }
+    #sidebar hr { border-color: #3d4f6e !important; }
+    #sidebar .dropdown-menu {
+      background: #1e2d48;
+      border-color: #3d4f6e;
+    }
+    #sidebar .dropdown-menu .dropdown-item {
+      color: #cdd6f4;
+    }
+    #sidebar .dropdown-menu .dropdown-item:hover {
+      background: #2d3a57;
+      color: #fff;
+    }
+    #sidebar .dropdown-header { color: #6c7ea0; }
+    #sidebar .dropdown-divider { border-color: #3d4f6e; }
 
     /* Offcanvas sidebar na mobilu */
     @media (max-width: 991.98px) {
@@ -54,20 +83,64 @@
       .main-content { padding: 1rem; }
     }
 
-    /* ── Mobile top navbar ── */
+    /* ── Mobile top navbar (vždy tmavý) ── */
     .mobile-navbar {
       background: #1a2236;
-      color: #fff;
       padding: .6rem 1rem;
     }
+    .mobile-navbar .navbar-brand-text {
+      color: #fff;
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
 
-    /* ── Cards & tables ── */
-    .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,.08); border-radius: 12px; }
+    /* ── Světlý režim ── */
+    [data-bs-theme="light"] body { background: #f5f7fa; }
+    [data-bs-theme="light"] .card {
+      border: none;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      border-radius: 12px;
+    }
+
+    /* ── Tmavý režim ── */
+    [data-bs-theme="dark"] body { background: #0f1117; }
+    [data-bs-theme="dark"] .card {
+      border: none;
+      box-shadow: 0 1px 6px rgba(0,0,0,.3);
+      border-radius: 12px;
+    }
+    [data-bs-theme="dark"] .card-header.bg-white {
+      background-color: var(--bs-card-bg) !important;
+    }
+    [data-bs-theme="dark"] .table-light {
+      --bs-table-bg: rgba(255,255,255,.04);
+      --bs-table-color: var(--bs-body-color);
+    }
+
+    /* ── Společné ── */
     .badge-method { font-size: .78rem; padding: .3em .65em; border-radius: 20px; }
-    .table th { font-weight: 600; font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; color: #6c757d; }
+    .table th { font-weight: 600; font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; }
 
-    /* Tabulky scrollovatelné na mobilu */
-    .table-responsive-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    /* Tlačítko přepínání tématu */
+    #themeToggle {
+      background: transparent;
+      border: 1px solid #3d4f6e;
+      color: #9ba8c5;
+      border-radius: 8px;
+      padding: .3rem .6rem;
+      cursor: pointer;
+      font-size: .85rem;
+      width: 100%;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      transition: background .15s;
+    }
+    #themeToggle:hover {
+      background: #2d3a57;
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -78,7 +151,7 @@
           data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-label="Menu">
     <i class="bi bi-list fs-5"></i>
   </button>
-  <span class="fw-bold" style="letter-spacing:.04em">Sales PD</span>
+  <span class="navbar-brand-text">Sales PD</span>
   {% if unread_news_count > 0 %}
   <a href="{{ url_for('novinky') }}" class="ms-auto">
     <span class="badge bg-danger">{{ unread_news_count }}</span>
@@ -177,6 +250,13 @@
         {% if current_user.is_admin %}<span class="badge bg-danger ms-1" style="font-size:.65rem">admin</span>{% endif %}
       </div>
       {% endif %}
+
+      <!-- Přepínač tmavý/světlý režim -->
+      <button id="themeToggle" onclick="toggleTheme()">
+        <i class="bi" id="themeIcon"></i>
+        <span id="themeLabel"></span>
+      </button>
+
       <div class="dropup w-100">
         <button class="btn btn-outline-secondary btn-sm w-100 dropdown-toggle"
                 data-bs-toggle="dropdown" aria-expanded="false">
@@ -226,7 +306,31 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  // Zavřít sidebar na mobilu po kliknutí na odkaz
+  // ── Téma ──
+  function applyTheme(theme) {
+    document.getElementById('htmlRoot').setAttribute('data-bs-theme', theme);
+    var icon  = document.getElementById('themeIcon');
+    var label = document.getElementById('themeLabel');
+    if (theme === 'dark') {
+      icon.className  = 'bi bi-sun';
+      label.textContent = 'Světlý režim';
+    } else {
+      icon.className  = 'bi bi-moon';
+      label.textContent = 'Tmavý režim';
+    }
+  }
+
+  function toggleTheme() {
+    var current = document.getElementById('htmlRoot').getAttribute('data-bs-theme');
+    var next = current === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('theme', next);
+    applyTheme(next);
+  }
+
+  // Inicializace při načtení
+  applyTheme(localStorage.getItem('theme') || 'light');
+
+  // ── Zavřít sidebar na mobilu po kliknutí na odkaz ──
   document.querySelectorAll('#sidebarNav .nav-link').forEach(function(link) {
     link.addEventListener('click', function() {
       var sidebarEl = document.getElementById('sidebar');
