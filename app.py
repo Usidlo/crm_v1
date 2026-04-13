@@ -804,6 +804,9 @@ def load_ares(id):
     parts = []
     errors = []
 
+    data = {}
+    nazev = client.name
+
     # 1) ARES — základní údaje
     try:
         resp = _fetch(f'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}')
@@ -812,33 +815,58 @@ def load_ares(id):
             return redirect(url_for('client_detail', id=id))
         resp.raise_for_status()
         data = resp.json()
-        nazev = data.get('obchodniJmeno', '')
+        nazev = data.get('obchodniJmeno', '') or client.name
         sidlo = data.get('sidlo') or {}
         adresa = sidlo.get('textovaAdresa', '')
+        # Přepisujeme název vždy (officiální zdroj), adresu jen pokud prázdná
         if nazev:
             client.name = nazev
             client.company = nazev
-        if adresa:
+        if adresa and not client.address:
             client.address = adresa
-        stat = data.get('statistickeUdaje') or {}
-        emp_code = str(stat.get('pocetZamestnancuKod', ''))
-        if emp_code in EMPLOYEE_CODE_TO_SIZE:
-            client.size_category = EMPLOYEE_CODE_TO_SIZE[emp_code]
+        # Velikost — jen pokud není ručně zadaná
+        if not client.size_category:
+            stat = data.get('statistickeUdaje') or {}
+            emp_code = str(stat.get('pocetZamestnancuKod', ''))
+            if emp_code in EMPLOYEE_CODE_TO_SIZE:
+                client.size_category = EMPLOYEE_CODE_TO_SIZE[emp_code]
         parts.append('základní údaje')
     except Exception as e:
         errors.append(f'ARES: {e}')
-        nazev = client.name
 
-    # 2) kurzy.cz — statutáři a velikost
+    # 2a) Statutáři z ARES JSON (zastupciSubjektu)
+    statutory_found = False
     try:
-        scraped_statutory, scraped_size = _scrape_statutory_and_size(ico)
-        if scraped_statutory:
-            client.statutory = scraped_statutory
-            parts.append('statutáři')
-        if scraped_size and not client.size_category:
-            client.size_category = scraped_size
-    except Exception as e:
-        errors.append(f'statutáři: {e}')
+        zastupci = data.get('zastupciSubjektu') or []
+        lines = []
+        for z in zastupci:
+            funkce = (z.get('typFunkce') or z.get('clenstvi', {}).get('nazev') or '').strip()
+            osoba = z.get('zastupce') or z.get('fyzickaOsoba') or {}
+            jmeno = ' '.join(filter(None, [
+                osoba.get('jmeno', ''), osoba.get('prijmeni', '')
+            ])).strip()
+            if not jmeno:
+                jmeno = str(osoba.get('obchodniJmeno', '')).strip()
+            if jmeno:
+                lines.append(f'{funkce}: {jmeno}' if funkce else jmeno)
+        if lines:
+            client.statutory = '\n'.join(lines)
+            parts.append('statutáři (ARES)')
+            statutory_found = True
+    except Exception:
+        pass
+
+    # 2b) Statutáři z kurzy.cz jako záložka
+    if not statutory_found:
+        try:
+            scraped_statutory, scraped_size = _scrape_statutory_and_size(ico)
+            if scraped_statutory:
+                client.statutory = scraped_statutory
+                parts.append('statutáři (kurzy.cz)')
+            if scraped_size and not client.size_category:
+                client.size_category = scraped_size
+        except Exception as e:
+            errors.append(f'statutáři kurzy.cz: {e}')
 
     # 3) ARES — pobočky/provozovny
     try:
