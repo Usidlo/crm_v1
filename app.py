@@ -359,7 +359,6 @@ class LoginLog(db.Model):
     ip_address = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user       = db.relationship('User', backref='login_logs')
-    user        = db.relationship('User', backref='audit_logs')
 
 
 # ── Audit log helper ────────────────────────────────────────────────────────
