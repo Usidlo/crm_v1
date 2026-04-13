@@ -73,16 +73,17 @@
         </button>
         <a href="{{ url_for('client_detail', id=client.id) }}" class="btn btn-outline-secondary">Zrušit</a>
         {% if contact %}
-        <form method="post" action="{{ url_for('delete_contact', id=contact.id) }}"
-              class="ms-auto"
-              onsubmit="return confirm('Opravdu smazat tuto kontaktní osobu?')">
-          <button type="submit" class="btn btn-outline-danger btn-sm">
-            <i class="bi bi-trash me-1"></i>Smazat
-          </button>
-        </form>
+        <button type="button" class="btn btn-outline-danger btn-sm ms-auto"
+                onclick="if(confirm('Opravdu smazat tuto kontaktní osobu?')) document.getElementById('deleteContactForm').submit()">
+          <i class="bi bi-trash me-1"></i>Smazat
+        </button>
         {% endif %}
       </div>
     </form>
+    {% if contact %}
+    <form id="deleteContactForm" method="post"
+          action="{{ url_for('delete_contact', id=contact.id) }}" class="d-none"></form>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
