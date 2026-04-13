@@ -201,15 +201,15 @@
         </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link {% if 'member' in (request.endpoint or '') or request.endpoint == 'team' %}active{% endif %}"
-           href="{{ url_for('team') }}">
-          <i class="bi bi-person-badge"></i>Tým
-        </a>
-      </li>
-      <li class="nav-item">
         <a class="nav-link {% if 'deal' in (request.endpoint or '') %}active{% endif %}"
            href="{{ url_for('deals') }}">
           <i class="bi bi-briefcase"></i>Obchody
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'all_interactions' %}active{% endif %}"
+           href="{{ url_for('all_interactions') }}">
+          <i class="bi bi-chat-dots"></i>Kontakty
         </a>
       </li>
       <li class="nav-item">
@@ -228,9 +228,9 @@
         </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link {% if request.endpoint == 'report' %}active{% endif %}"
-           href="{{ url_for('report') }}">
-          <i class="bi bi-bar-chart-line"></i>Report
+        <a class="nav-link {% if 'member' in (request.endpoint or '') or request.endpoint == 'team' %}active{% endif %}"
+           href="{{ url_for('team') }}">
+          <i class="bi bi-person-badge"></i>Tým
         </a>
       </li>
       {% if current_user and current_user.is_admin %}
@@ -241,6 +241,12 @@
         </a>
       </li>
       {% endif %}
+      <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'report' %}active{% endif %}"
+           href="{{ url_for('report') }}">
+          <i class="bi bi-bar-chart-line"></i>Reporty
+        </a>
+      </li>
     </ul>
 
     <div class="mt-auto px-3 pb-3 d-flex flex-column gap-2">

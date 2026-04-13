@@ -378,7 +378,9 @@
       <tbody>
         {% for d in deals %}
         <tr>
-          <td class="fw-semibold small">{{ d.title }}</td>
+          <td class="fw-semibold small">
+            <a href="{{ url_for('deal_detail', id=d.id) }}" class="text-decoration-none text-dark">{{ d.title }}</a>
+          </td>
           <td>
             <span class="badge bg-{{ pipeline_colors.get(d.status, 'secondary') }}">
               {{ pipeline_labels.get(d.status, d.status) }}
