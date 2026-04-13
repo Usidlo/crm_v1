@@ -290,6 +290,7 @@ class Reminder(db.Model):
     notes = db.Column(db.Text)
     done = db.Column(db.Boolean, default=False, nullable=False)
     notified = db.Column(db.Boolean, default=False, nullable=False)
+    notified_day = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -2222,6 +2223,7 @@ with app.app_context():
             'ALTER TABLE client_news ADD COLUMN IF NOT EXISTS contact_id INTEGER REFERENCES contact_person(id)',
             'ALTER TABLE client_news ADD COLUMN IF NOT EXISTS deal_id INTEGER REFERENCES deal(id)',
             'ALTER TABLE reminder ADD COLUMN IF NOT EXISTS notified BOOLEAN DEFAULT FALSE',
+            'ALTER TABLE reminder ADD COLUMN IF NOT EXISTS notified_day BOOLEAN DEFAULT FALSE',
         ]
     else:
         migrations = [
@@ -2252,6 +2254,7 @@ with app.app_context():
             'ALTER TABLE client_news ADD COLUMN contact_id INTEGER REFERENCES contact_person(id)',
             'ALTER TABLE client_news ADD COLUMN deal_id INTEGER REFERENCES deal(id)',
             'ALTER TABLE reminder ADD COLUMN notified BOOLEAN DEFAULT 0',
+            'ALTER TABLE reminder ADD COLUMN notified_day BOOLEAN DEFAULT 0',
         ]
     with db.engine.connect() as conn:
         for sql in migrations:
@@ -2299,38 +2302,51 @@ def _send_email(to: str, subject: str, body_html: str):
 
 
 def _reminder_notify():
-    """Pošle upozornění na remindry splatné za 24–25 hodin, které ještě nebyly notifikovány."""
+    """Pošle upozornění na remindry — den předem a hodinu předem."""
     with app.app_context():
         now = datetime.utcnow()
-        window_start = now + timedelta(hours=24)
-        window_end   = now + timedelta(hours=25)
-        reminders = Reminder.query.filter(
-            Reminder.done == False,
-            Reminder.notified == False,
-            Reminder.due_at >= window_start,
-            Reminder.due_at <= window_end,
-        ).all()
-        for r in reminders:
-            email = None
-            if r.assigned_member and r.assigned_member.email:
-                email = r.assigned_member.email
-            if not email:
-                continue
+
+        def _send_reminder(r, label):
+            if not r.assigned_member or not r.assigned_member.email:
+                return
             due_str = r.due_at.strftime('%d.%m.%Y %H:%M')
             client_name = r.client.name if r.client else '—'
+            notes_row = f'<tr><td style="padding:4px 12px 4px 0;color:#666;font-weight:bold">Poznámka:</td><td>{r.notes}</td></tr>' if r.notes else ''
             body = f"""
 <p>Ahoj,</p>
-<p>připomínáme reminder, který máš za méně než hodinu:</p>
+<p>připomínáme reminder, který máš <strong>{label}</strong>:</p>
 <table style="border-collapse:collapse;margin:16px 0">
   <tr><td style="padding:4px 12px 4px 0;color:#666;font-weight:bold">Klient:</td><td>{client_name}</td></tr>
   <tr><td style="padding:4px 12px 4px 0;color:#666;font-weight:bold">Název:</td><td>{r.title}</td></tr>
   <tr><td style="padding:4px 12px 4px 0;color:#666;font-weight:bold">Termín:</td><td>{due_str}</td></tr>
-  {'<tr><td style="padding:4px 12px 4px 0;color:#666;font-weight:bold">Poznámka:</td><td>' + r.notes + '</td></tr>' if r.notes else ''}
+  {notes_row}
 </table>
 <p style="color:#888;font-size:12px">— Sales PD</p>
 """
-            _send_email(email, f'⏰ Reminder: {r.title} ({due_str})', body)
+            _send_email(r.assigned_member.email, f'⏰ Reminder: {r.title} ({due_str})', body)
+
+        # Upozornění den předem (24–25 hodin)
+        day_reminders = Reminder.query.filter(
+            Reminder.done == False,
+            Reminder.notified_day == False,
+            Reminder.due_at >= now + timedelta(hours=24),
+            Reminder.due_at <= now + timedelta(hours=25),
+        ).all()
+        for r in day_reminders:
+            _send_reminder(r, 'za 1 den')
+            r.notified_day = True
+
+        # Upozornění hodinu předem (1–2 hodiny)
+        hour_reminders = Reminder.query.filter(
+            Reminder.done == False,
+            Reminder.notified == False,
+            Reminder.due_at >= now + timedelta(hours=1),
+            Reminder.due_at <= now + timedelta(hours=2),
+        ).all()
+        for r in hour_reminders:
+            _send_reminder(r, 'za méně než hodinu')
             r.notified = True
+
         db.session.commit()
 
 
