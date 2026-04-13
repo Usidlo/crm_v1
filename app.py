@@ -1580,6 +1580,10 @@ def edit_contact(id):
 def delete_contact(id):
     contact = ContactPerson.query.get_or_404(id)
     client_id = contact.client_id
+    # Odpojit ze všech obchodů (deal_contact association)
+    contact.deals = []
+    # Odpojit z interakcí (nastavit na NULL)
+    Interaction.query.filter_by(contact_person_id=id).update({'contact_person_id': None})
     db.session.delete(contact)
     db.session.commit()
     flash('Kontaktní osoba byla smazána.', 'warning')
