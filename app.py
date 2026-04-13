@@ -1542,6 +1542,16 @@ def new_deal():
                            client_contacts=preselected_contacts)
 
 
+@app.route('/deals/<int:id>')
+@login_required
+def deal_detail(id):
+    deal = Deal.query.get_or_404(id)
+    audit_log = (AuditLog.query
+                 .filter_by(entity_type='deal', entity_id=id)
+                 .order_by(AuditLog.created_at.desc()).limit(30).all())
+    return render_template('deal_detail.html', deal=deal, audit_log=audit_log)
+
+
 @app.route('/deals/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_deal(id):

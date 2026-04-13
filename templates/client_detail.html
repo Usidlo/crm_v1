@@ -394,9 +394,9 @@
           <td class="small text-muted">{{ d.next_step or '—' }}</td>
           <td class="small text-muted">{{ d.created_at.strftime('%d.%m.%Y') }}</td>
           <td class="text-end">
-            <a href="{{ url_for('edit_deal', id=d.id) }}"
-               class="btn btn-sm btn-outline-secondary" title="Upravit">
-              <i class="bi bi-pencil"></i>
+            <a href="{{ url_for('deal_detail', id=d.id) }}"
+               class="btn btn-sm btn-outline-secondary" title="Detail">
+              <i class="bi bi-eye"></i>
             </a>
           </td>
         </tr>
