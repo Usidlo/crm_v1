@@ -24,7 +24,7 @@
       <tbody>
         {% for l in logs %}
         <tr>
-          <td class="text-nowrap small">{{ l.created_at.strftime('%d.%m.%Y %H:%M:%S') }}</td>
+          <td class="text-nowrap small">{{ (l.created_at | prague).strftime('%d.%m.%Y %H:%M:%S') }}</td>
           <td class="fw-semibold small">{{ l.user.username }}</td>
           <td class="text-muted small">{{ l.ip_address or '—' }}</td>
         </tr>

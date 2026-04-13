@@ -97,7 +97,7 @@
                 </div>
               </div>
               <div class="text-end text-nowrap small {{ 'text-danger fw-semibold' if overdue else 'text-muted' }}">
-                {{ r.due_at.strftime('%d.%m.') }}<br>{{ r.due_at.strftime('%H:%M') }}
+                {{ (r.due_at | prague).strftime('%d.%m.') }}<br>{{ (r.due_at | prague).strftime('%H:%M') }}
                 {% if overdue %}<div><span class="badge bg-danger">Po termínu</span></div>{% endif %}
               </div>
             </div>
@@ -149,7 +149,7 @@
                 <div class="small text-muted">{{ item.title }}</div>
               </div>
               <div class="text-muted text-nowrap" style="font-size:.75rem">
-                {{ item.created_at.strftime('%d.%m.') }}
+                {{ (item.created_at | prague).strftime('%d.%m.') }}
               </div>
             </div>
           </li>
@@ -229,7 +229,7 @@
           <tbody>
             {% for i in recent %}
             <tr>
-              <td class="text-nowrap small">{{ i.date.strftime('%d.%m.%Y %H:%M') }}</td>
+              <td class="text-nowrap small">{{ (i.date | prague).strftime('%d.%m.%Y %H:%M') }}</td>
               <td>
                 <a href="{{ url_for('client_detail', id=i.client_id) }}" class="text-decoration-none fw-semibold small">
                   {{ i.client.name }}

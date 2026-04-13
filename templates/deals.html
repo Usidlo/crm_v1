@@ -64,7 +64,7 @@
           </td>
           <td class="small">{{ d.owner.name if d.owner else '—' }}</td>
           <td class="small text-muted">{{ d.next_step or '—' }}</td>
-          <td class="small text-muted">{{ d.updated_at.strftime('%d.%m.%Y') }}</td>
+          <td class="small text-muted">{{ (d.updated_at | prague).strftime('%d.%m.%Y') }}</td>
           <td class="text-end">
             <a href="{{ url_for('deal_detail', id=d.id) }}" class="btn btn-sm btn-outline-secondary" title="Detail">
               <i class="bi bi-eye"></i>

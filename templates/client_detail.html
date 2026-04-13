@@ -116,7 +116,7 @@
         <div class="text-muted small fw-semibold mb-1">Poznámky</div>
         <div class="small">{{ client.notes }}</div>
         {% endif %}
-        <div class="text-muted small mt-2">Přidán {{ client.created_at.strftime('%d.%m.%Y') }}</div>
+        <div class="text-muted small mt-2">Přidán {{ (client.created_at | prague).strftime('%d.%m.%Y') }}</div>
       </div>
     </div>
 
@@ -300,8 +300,8 @@
           </td>
           <td class="text-nowrap small {% if overdue %}text-danger fw-semibold{% endif %}">
             {% if r.done %}<s>{% endif %}
-            {{ r.due_at.strftime('%d.%m.%Y') }}<br>
-            <span class="{% if not overdue and not r.done %}text-muted{% endif %}">{{ r.due_at.strftime('%H:%M') }}</span>
+            {{ (r.due_at | prague).strftime('%d.%m.%Y') }}<br>
+            <span class="{% if not overdue and not r.done %}text-muted{% endif %}">{{ (r.due_at | prague).strftime('%H:%M') }}</span>
             {% if r.done %}</s>{% endif %}
             {% if overdue %}<span class="badge bg-danger ms-1">Po termínu</span>{% endif %}
           </td>
@@ -399,7 +399,7 @@
             {% endif %}
           </td>
           <td class="small text-muted">{{ d.next_step or '—' }}</td>
-          <td class="small text-muted">{{ d.created_at.strftime('%d.%m.%Y') }}</td>
+          <td class="small text-muted">{{ (d.created_at | prague).strftime('%d.%m.%Y') }}</td>
           <td class="text-end">
             <a href="{{ url_for('deal_detail', id=d.id) }}"
                class="btn btn-sm btn-outline-secondary" title="Detail">
@@ -445,8 +445,8 @@
       <tbody>
         {% for i in interactions %}
         <tr>
-          <td class="text-nowrap small">{{ i.date.strftime('%d.%m.%Y') }}<br>
-            <span class="text-muted">{{ i.date.strftime('%H:%M') }}</span>
+          <td class="text-nowrap small">{{ (i.date | prague).strftime('%d.%m.%Y') }}<br>
+            <span class="text-muted">{{ (i.date | prague).strftime('%H:%M') }}</span>
           </td>
           <td class="fw-semibold small">{{ i.member.name }}</td>
           <td class="small">
@@ -511,7 +511,7 @@
       <tbody>
         {% for a in audit_log %}
         <tr>
-          <td class="text-muted text-nowrap">{{ a.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+          <td class="text-muted text-nowrap">{{ (a.created_at | prague).strftime('%d.%m.%Y %H:%M') }}</td>
           <td>{{ a.user.username if a.user else '—' }}</td>
           <td>
             <span class="badge bg-{{ 'success' if a.action == 'create' else ('warning' if a.action == 'update' else 'danger') }} bg-opacity-75">

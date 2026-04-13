@@ -46,7 +46,7 @@
       <tbody>
         {% for a in logs %}
         <tr>
-          <td class="text-nowrap text-muted">{{ a.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+          <td class="text-nowrap text-muted">{{ (a.created_at | prague).strftime('%d.%m.%Y %H:%M') }}</td>
           <td class="fw-semibold">{{ a.user.username if a.user else '—' }}</td>
           <td><span class="badge bg-light text-dark border">{{ a.entity_type }}</span></td>
           <td>

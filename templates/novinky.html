@@ -90,7 +90,7 @@
             {% endif %}
             <!-- Čas -->
             <span class="text-muted small ms-auto">
-              {{ item.created_at.strftime('%d.%m.%Y %H:%M') }}
+              {{ (item.created_at | prague).strftime('%d.%m.%Y %H:%M') }}
             </span>
           </div>
 

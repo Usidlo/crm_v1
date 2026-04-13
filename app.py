@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -146,9 +147,24 @@ NAME_DAYS = {
 }
 
 
+_PRAGUE = ZoneInfo('Europe/Prague')
+
+
+def now_prague():
+    """Aktuální čas v pražském časovém pásmu (naive)."""
+    return datetime.now(tz=_PRAGUE).replace(tzinfo=None)
+
+
+def utc_to_prague(dt):
+    """Převede UTC naive datetime na Prague naive datetime pro zobrazení."""
+    if dt is None:
+        return dt
+    return dt.replace(tzinfo=ZoneInfo('UTC')).astimezone(_PRAGUE).replace(tzinfo=None)
+
+
 def get_todays_nameday_name():
     """Vrátí jméno dnešního svátku (nebo prázdný řetězec)."""
-    return NAME_DAYS.get(datetime.utcnow().strftime('%m-%d'), '')
+    return NAME_DAYS.get(now_prague().strftime('%m-%d'), '')
 
 
 def get_nameday_contacts(name):
@@ -277,6 +293,7 @@ NEWS_PRIORITY_COLORS = {'high': 'danger', 'medium': 'warning', 'low': 'secondary
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'crm-secret-key-2024'
+app.jinja_env.filters['prague'] = utc_to_prague
 
 # ── Přihlášení & Uživatelé ──────────────────────────────────────────────────
 
@@ -599,7 +616,7 @@ def dashboard():
                            recent_news=recent_news,
                            view=view,
                            has_member=bool(my_member_id),
-                           now=datetime.utcnow(),
+                           now=now_prague(),
                            nd_name=nd_name,
                            nd_contacts=nd_contacts)
 
@@ -695,7 +712,7 @@ def client_detail(id):
                          AuditLog.entity_id == id)
                  .order_by(AuditLog.created_at.desc()).limit(50).all())
     members = TeamMember.query.order_by(TeamMember.name).all()
-    now = datetime.utcnow()
+    now = now_prague()
     return render_template('client_detail.html', client=client,
                            interactions=interactions, reminders=reminders,
                            deals=deals, audit_log=audit_log,
@@ -1970,7 +1987,7 @@ def all_reminders():
                    .order_by(Reminder.due_at.desc())
                    .limit(30).all())
     members = TeamMember.query.order_by(TeamMember.name).all()
-    now = datetime.utcnow()
+    now = now_prague()
     return render_template('reminders.html', pending=pending, done_recent=done_recent,
                            members=members, now=now, member_filter=member_filter)
 
@@ -2048,7 +2065,7 @@ def delete_reminder(id):
 def all_interactions():
     q          = request.args.get('q', '').strip()
     member_id  = request.args.get('member', '').strip()
-    default_from = (datetime.utcnow() - timedelta(days=14)).strftime('%Y-%m-%d')
+    default_from = (now_prague() - timedelta(days=14)).strftime('%Y-%m-%d')
     date_from  = request.args.get('date_from', default_from).strip()
     date_to    = request.args.get('date_to', '').strip()
 
@@ -2215,7 +2232,7 @@ NEWS_LABELS = {
 def _news_exists(client_id, category, title, days=7):
     """Vrátí True pokud stejná novinka již existuje v posledních N dnech."""
     from datetime import timedelta
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = now_prague() - timedelta(days=days)
     return ClientNews.query.filter(
         ClientNews.client_id == client_id,
         ClientNews.category  == category,
@@ -2386,7 +2403,7 @@ def admin_audit_log():
 @login_required
 def report():
     period = request.args.get('period', 'month')  # week, month, quarter
-    now = datetime.utcnow()
+    now = now_prague()
     if period == 'week':
         since = now - timedelta(days=7)
         label = 'Tento týden'
@@ -2612,7 +2629,7 @@ def _send_email(to: str, subject: str, body_html: str):
 def _reminder_notify():
     """Pošle upozornění na remindry — den předem a hodinu předem."""
     with app.app_context():
-        now = datetime.utcnow()
+        now = now_prague()
 
         def _send_reminder(r, label):
             if not r.assigned_member or not r.assigned_member.email:
@@ -2661,7 +2678,7 @@ def _reminder_notify():
 def _weekly_digest():
     """Každé pondělí ráno pošle souhrn novinek z posledního týdne všem členům týmu."""
     with app.app_context():
-        since = datetime.utcnow() - timedelta(days=7)
+        since = now_prague() - timedelta(days=7)
         items = (ClientNews.query
                  .filter(ClientNews.created_at >= since)
                  .order_by(ClientNews.client_id, ClientNews.created_at.desc())
@@ -2687,7 +2704,7 @@ def _weekly_digest():
 
         body = f"""
 <p>Ahoj,</p>
-<p>zde je přehled novinek z posledního týdne ({since.strftime('%d.%m.')} – {datetime.utcnow().strftime('%d.%m.%Y')}):</p>
+<p>zde je přehled novinek z posledního týdne ({since.strftime('%d.%m.')} – {now_prague().strftime('%d.%m.%Y')}):</p>
 <table style="border-collapse:collapse;width:100%;font-size:14px">
   <thead>
     <tr style="background:#f5f7fa;color:#666;text-transform:uppercase;font-size:12px">

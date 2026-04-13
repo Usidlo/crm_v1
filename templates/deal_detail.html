@@ -56,11 +56,11 @@
             </tr>
             <tr>
               <td class="text-muted fw-semibold">Vytvořen</td>
-              <td>{{ deal.created_at.strftime('%d.%m.%Y') }}</td>
+              <td>{{ (deal.created_at | prague).strftime('%d.%m.%Y') }}</td>
             </tr>
             <tr>
               <td class="text-muted fw-semibold">Aktualizován</td>
-              <td>{{ deal.updated_at.strftime('%d.%m.%Y %H:%M') }}</td>
+              <td>{{ (deal.updated_at | prague).strftime('%d.%m.%Y %H:%M') }}</td>
             </tr>
           </tbody>
         </table>
@@ -150,7 +150,7 @@
           <tbody>
             {% for a in audit_log %}
             <tr>
-              <td class="text-muted text-nowrap">{{ a.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+              <td class="text-muted text-nowrap">{{ (a.created_at | prague).strftime('%d.%m.%Y %H:%M') }}</td>
               <td>{{ a.user.username if a.user else '—' }}</td>
               <td>
                 <span class="badge bg-{{ 'success' if a.action == 'create' else ('warning' if a.action == 'update' else 'danger') }} bg-opacity-75">

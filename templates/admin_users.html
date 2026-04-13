@@ -65,7 +65,7 @@
               <span class="badge bg-secondary">Deaktivován</span>
             {% endif %}
           </td>
-          <td class="text-muted small">{{ u.created_at.strftime('%d.%m.%Y') }}</td>
+          <td class="text-muted small">{{ (u.created_at | prague).strftime('%d.%m.%Y') }}</td>
           <td class="text-end text-nowrap">
             <a href="{{ url_for('admin_edit_user', id=u.id) }}"
                class="btn btn-sm btn-outline-secondary me-1">

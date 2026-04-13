@@ -49,8 +49,8 @@
             </form>
           </td>
           <td class="text-nowrap small {% if overdue %}text-danger fw-semibold{% endif %}">
-            {{ r.due_at.strftime('%d.%m.%Y') }}<br>
-            <span class="{% if not overdue %}text-muted{% endif %}">{{ r.due_at.strftime('%H:%M') }}</span>
+            {{ (r.due_at | prague).strftime('%d.%m.%Y') }}<br>
+            <span class="{% if not overdue %}text-muted{% endif %}">{{ (r.due_at | prague).strftime('%H:%M') }}</span>
             {% if overdue %}<span class="badge bg-danger ms-1">Po termínu</span>{% endif %}
           </td>
           <td class="small">
@@ -129,7 +129,7 @@
             </form>
           </td>
           <td class="text-nowrap small">
-            <s>{{ r.due_at.strftime('%d.%m.%Y %H:%M') }}</s>
+            <s>{{ (r.due_at | prague).strftime('%d.%m.%Y %H:%M') }}</s>
           </td>
           <td class="small">
             <a href="{{ url_for('client_detail', id=r.client_id) }}" class="text-decoration-none text-muted">
