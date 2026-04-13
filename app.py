@@ -173,7 +173,10 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for('login'))
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:////data/crm.db')
+_db_url = os.environ.get('DATABASE_URL', 'sqlite:///crm.db')
+if _db_url.startswith('postgres://'):
+    _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -2188,8 +2191,40 @@ def admin_delete_user(id):
 with app.app_context():
     db.create_all()
     # Migrace — přidej sloupce, které v starší DB chybí
-    with db.engine.connect() as conn:
-        for sql in [
+    # PostgreSQL: IF NOT EXISTS zabrání chybě při opakovaném spuštění
+    is_pg = 'postgresql' in app.config['SQLALCHEMY_DATABASE_URI']
+    if is_pg:
+        migrations = [
+            'ALTER TABLE interaction ADD COLUMN IF NOT EXISTS contact_person_id INTEGER REFERENCES contact_person(id)',
+            'ALTER TABLE client ADD COLUMN IF NOT EXISTS ico VARCHAR(20)',
+            'ALTER TABLE client ADD COLUMN IF NOT EXISTS website VARCHAR(500)',
+            'ALTER TABLE client ADD COLUMN IF NOT EXISTS web_description TEXT',
+            'ALTER TABLE client ADD COLUMN IF NOT EXISTS address VARCHAR(500)',
+            'ALTER TABLE client ADD COLUMN IF NOT EXISTS statutory TEXT',
+            'ALTER TABLE client ADD COLUMN IF NOT EXISTS branches TEXT',
+            'ALTER TABLE client ADD COLUMN IF NOT EXISTS size_category VARCHAR(20)',
+            'ALTER TABLE client ADD COLUMN IF NOT EXISTS temperature VARCHAR(10)',
+            'ALTER TABLE client ADD COLUMN IF NOT EXISTS last_refreshed_at TIMESTAMP',
+            'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS team_member_id INTEGER REFERENCES team_member(id)',
+            'ALTER TABLE client ADD COLUMN IF NOT EXISTS size_quality VARCHAR(20)',
+            'ALTER TABLE client ADD COLUMN IF NOT EXISTS pipeline_status VARCHAR(30)',
+            'ALTER TABLE client ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES team_member(id)',
+            'ALTER TABLE contact_person ADD COLUMN IF NOT EXISTS contact_type VARCHAR(30)',
+            'ALTER TABLE contact_person ADD COLUMN IF NOT EXISTS contact_role VARCHAR(20)',
+            'ALTER TABLE contact_person ADD COLUMN IF NOT EXISTS trust_level VARCHAR(20)',
+            'ALTER TABLE client_news ADD COLUMN IF NOT EXISTS priority VARCHAR(10)',
+            'ALTER TABLE client_news ADD COLUMN IF NOT EXISTS source VARCHAR(50)',
+            'ALTER TABLE client_news ADD COLUMN IF NOT EXISTS old_value TEXT',
+            'ALTER TABLE client_news ADD COLUMN IF NOT EXISTS new_value TEXT',
+            'ALTER TABLE client_news ADD COLUMN IF NOT EXISTS confidence VARCHAR(10)',
+            'ALTER TABLE client_news ADD COLUMN IF NOT EXISTS requires_action BOOLEAN',
+            'ALTER TABLE client_news ADD COLUMN IF NOT EXISTS recommended_action VARCHAR(300)',
+            'ALTER TABLE client_news ADD COLUMN IF NOT EXISTS contact_id INTEGER REFERENCES contact_person(id)',
+            'ALTER TABLE client_news ADD COLUMN IF NOT EXISTS deal_id INTEGER REFERENCES deal(id)',
+            'ALTER TABLE reminder ADD COLUMN IF NOT EXISTS notified BOOLEAN DEFAULT FALSE',
+        ]
+    else:
+        migrations = [
             'ALTER TABLE interaction ADD COLUMN contact_person_id INTEGER REFERENCES contact_person(id)',
             'ALTER TABLE client ADD COLUMN ico VARCHAR(20)',
             'ALTER TABLE client ADD COLUMN website VARCHAR(500)',
@@ -2217,12 +2252,14 @@ with app.app_context():
             'ALTER TABLE client_news ADD COLUMN contact_id INTEGER REFERENCES contact_person(id)',
             'ALTER TABLE client_news ADD COLUMN deal_id INTEGER REFERENCES deal(id)',
             'ALTER TABLE reminder ADD COLUMN notified BOOLEAN DEFAULT 0',
-        ]:
+        ]
+    with db.engine.connect() as conn:
+        for sql in migrations:
             try:
                 conn.execute(text(sql))
                 conn.commit()
             except Exception:
-                pass
+                conn.rollback()
     # Vytvoř výchozího admina, pokud žádný uživatel neexistuje
     if User.query.count() == 0:
         admin = User(
