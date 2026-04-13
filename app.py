@@ -1631,17 +1631,15 @@ def delete_contact(id):
     contact = ContactPerson.query.get_or_404(id)
     client_id = contact.client_id
     contact_name = contact.name
-    # Odpojit ze všech obchodů (deal_contact M2M) + flush do DB
+    # Odpojit ze všech obchodů (deal_contact M2M)
     contact.deals = []
+    # Nullify interakcí přes ORM (backref 'interactions')
+    for interaction in list(contact.interactions):
+        interaction.contact_person_id = None
+    # Nullify novinek přes ORM (backref 'news_items')
+    for news_item in list(contact.news_items):
+        news_item.contact_id = None
     db.session.flush()
-    # Odpojit z interakcí (NULL) — synchronize_session=False aby ORM cache nepoblácala
-    Interaction.query.filter_by(contact_person_id=id).update(
-        {'contact_person_id': None}, synchronize_session=False)
-    # Odpojit z novinek (NULL)
-    ClientNews.query.filter_by(contact_id=id).update(
-        {'contact_id': None}, synchronize_session=False)
-    db.session.flush()
-    # Audit + smazání
     _audit('contact', id, 'delete')
     db.session.delete(contact)
     db.session.commit()
