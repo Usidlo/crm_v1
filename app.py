@@ -1896,11 +1896,9 @@ def email_debug():
 @admin_required
 def test_email():
     """Odešle testovací e-mail pro ověření konfigurace (admin only)."""
-    gmail_user = os.environ.get('GMAIL_USER', '')
-    debug_email = os.environ.get('DEBUG_EMAIL', '')
-    recipient = debug_email or gmail_user
+    recipient = os.environ.get('TEST_EMAIL', '').strip()
     if not recipient:
-        flash('E-mail není nakonfigurován (chybí GMAIL_USER).', 'danger')
+        flash('Není nastavena proměnná TEST_EMAIL.', 'danger')
         return redirect(url_for('admin_users'))
     sent_to, error = _send_email(
         recipient,
@@ -2663,12 +2661,11 @@ with app.app_context():
 # ── E-mail helpers ───────────────────────────────────────────────────────────
 
 def _send_email(to: str, subject: str, body_html: str):
-    """Odešle e-mail přes Resend API. Pokud DEBUG_EMAIL je nastaveno, přesměruje tam."""
+    """Odešle e-mail přes Resend API."""
     api_key = os.environ.get('RESEND_API_KEY', '')
-    debug_email = os.environ.get('DEBUG_EMAIL', '')
     if not api_key:
         return None, 'Chybí RESEND_API_KEY'
-    recipient = debug_email if debug_email else to
+    recipient = to
     if not recipient:
         return None, 'Chybí příjemce'
     try:
