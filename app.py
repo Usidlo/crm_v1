@@ -799,16 +799,17 @@ def load_ares(id):
     if not ico:
         flash('Nejdříve zadej IČO a ulož klienta.', 'warning')
         return redirect(url_for('client_detail', id=id))
+    parts = []
+    errors = []
+
+    # 1) ARES — základní údaje
     try:
-        # Základní údaje
         resp = _fetch(f'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}')
         if resp.status_code == 404:
             flash('IČO nebylo nalezeno v ARES.', 'danger')
             return redirect(url_for('client_detail', id=id))
         resp.raise_for_status()
         data = resp.json()
-
-        # Název a sídlo
         nazev = data.get('obchodniJmeno', '')
         sidlo = data.get('sidlo') or {}
         adresa = sidlo.get('textovaAdresa', '')
@@ -817,51 +818,52 @@ def load_ares(id):
             client.company = nazev
         if adresa:
             client.address = adresa
-
-        # Statutáři + velikost z kurzy.cz
-        scraped_statutory, scraped_size = _scrape_statutory_and_size(ico)
-        if scraped_statutory:
-            client.statutory = scraped_statutory
-
-        # Velikost — nejdřív ARES, pak kurzy.cz
         stat = data.get('statistickeUdaje') or {}
         emp_code = str(stat.get('pocetZamestnancuKod', ''))
         if emp_code in EMPLOYEE_CODE_TO_SIZE:
             client.size_category = EMPLOYEE_CODE_TO_SIZE[emp_code]
-        elif scraped_size:
-            client.size_category = scraped_size
-
-        # Pobočky — 1) ARES RŽP provozovny, 2) web firmy
-        branches_found = False
-        try:
-            presp = _fetch(
-                f'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}/provozovny'
-            )
-            if presp.status_code == 200:
-                pdata = presp.json()
-                provozovny = pdata.get('provozovny') or (pdata if isinstance(pdata, list) else [])
-                branch_lines = []
-                for p in provozovny[:20]:
-                    nazev_p = p.get('nazevProvozovny', '')
-                    adresa_p = (p.get('adresa') or {}).get('textovaAdresa', '')
-                    line = nazev_p or adresa_p
-                    if line:
-                        branch_lines.append(line)
-                if branch_lines:
-                    client.branches = '\n'.join(branch_lines)
-                    branches_found = True
-        except Exception:
-            pass
-
-        if not branches_found and client.website:
-            scraped_branches = _scrape_branches(client.website)
-            if scraped_branches:
-                client.branches = scraped_branches
-
-        db.session.commit()
-        flash(f'Údaje z ARES načteny: {nazev}', 'success')
+        parts.append('základní údaje')
     except Exception as e:
-        flash(f'Chyba při načítání z ARES: {e}', 'danger')
+        errors.append(f'ARES: {e}')
+        nazev = client.name
+
+    # 2) kurzy.cz — statutáři a velikost
+    try:
+        scraped_statutory, scraped_size = _scrape_statutory_and_size(ico)
+        if scraped_statutory:
+            client.statutory = scraped_statutory
+            parts.append('statutáři')
+        if scraped_size and not client.size_category:
+            client.size_category = scraped_size
+    except Exception as e:
+        errors.append(f'statutáři: {e}')
+
+    # 3) ARES — pobočky/provozovny
+    try:
+        presp = _fetch(
+            f'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}/provozovny'
+        )
+        if presp.status_code == 200:
+            pdata = presp.json()
+            provozovny = pdata.get('provozovny') or (pdata if isinstance(pdata, list) else [])
+            branch_lines = []
+            for p in provozovny[:20]:
+                nazev_p = p.get('nazevProvozovny', '')
+                adresa_p = (p.get('adresa') or {}).get('textovaAdresa', '')
+                line = nazev_p or adresa_p
+                if line:
+                    branch_lines.append(line)
+            if branch_lines:
+                client.branches = '\n'.join(branch_lines)
+                parts.append('pobočky')
+    except Exception as e:
+        errors.append(f'pobočky: {e}')
+
+    db.session.commit()
+    if parts:
+        flash(f'Načteno z ARES: {", ".join(parts)}.', 'success')
+    if errors:
+        flash(f'Část dat se nepodařilo načíst: {"; ".join(errors)}', 'warning')
     return redirect(url_for('client_detail', id=id))
 
 
@@ -1091,7 +1093,7 @@ def _get_proxies():
     return {}
 
 
-def _fetch(url, timeout=10):
+def _fetch(url, timeout=6):
     headers = {'User-Agent': 'Mozilla/5.0 (compatible; CRM-bot/1.0)'}
     return requests.get(url, timeout=timeout, headers=headers, proxies=_get_proxies())
 
