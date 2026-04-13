@@ -1630,13 +1630,18 @@ def edit_contact(id):
 def delete_contact(id):
     contact = ContactPerson.query.get_or_404(id)
     client_id = contact.client_id
-    # Odpojit ze všech obchodů (deal_contact association)
+    contact_name = contact.name
+    # Odpojit ze všech obchodů (deal_contact M2M)
     contact.deals = []
     # Odpojit z interakcí (nastavit na NULL)
     Interaction.query.filter_by(contact_person_id=id).update({'contact_person_id': None})
+    # Odpojit z novinek (nastavit na NULL)
+    ClientNews.query.filter_by(contact_id=id).update({'contact_id': None})
+    # Audit před smazáním
+    _audit('contact', id, 'delete')
     db.session.delete(contact)
     db.session.commit()
-    flash('Kontaktní osoba byla smazána.', 'warning')
+    flash(f'Kontaktní osoba „{contact_name}" byla smazána.', 'warning')
     return redirect(url_for('client_detail', id=client_id))
 
 
