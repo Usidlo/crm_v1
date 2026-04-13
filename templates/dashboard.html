@@ -24,10 +24,21 @@
   <span style="font-size:1.4rem">🎂</span>
   <div>
     <strong>Dnes slaví {{ nd_name }}</strong> —
-    {% for c in nd_contacts %}
+    {% for c in nd_contacts[:2] %}
       <a href="{{ url_for('client_detail', id=c.client_id) }}" class="fw-semibold text-decoration-none">{{ c.name }}</a>
-      <span class="text-muted small">({{ c.client.name }})</span>{% if not loop.last %}, {% endif %}
+      <span class="text-muted small">({{ c.client.name }})</span>{% if not loop.last or nd_contacts|length > 2 %}, {% endif %}
     {% endfor %}
+    {% if nd_contacts|length > 2 %}
+      <a class="text-decoration-none small" data-bs-toggle="collapse" href="#nd-rest" style="cursor:pointer">
+        +{{ nd_contacts|length - 2 }} další
+      </a>
+      <div class="collapse" id="nd-rest">
+        {% for c in nd_contacts[2:] %}
+          <a href="{{ url_for('client_detail', id=c.client_id) }}" class="fw-semibold text-decoration-none">{{ c.name }}</a>
+          <span class="text-muted small">({{ c.client.name }})</span>{% if not loop.last %}, {% endif %}
+        {% endfor %}
+      </div>
+    {% endif %}
   </div>
 </div>
 {% elif nd_name %}
