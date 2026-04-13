@@ -165,7 +165,7 @@
   </div>
 
   <!-- Contact persons -->
-  <div class="col-md-8">
+  <div class="col-md-7">
     <div class="card h-100">
       <div class="card-header bg-white d-flex align-items-center py-3">
         <span class="fw-semibold me-auto">
@@ -190,6 +190,7 @@
       </div>
       <div class="card-body p-0">
         {% if client.contacts %}
+        <div class="table-responsive">
         <table class="table table-hover mb-0 align-middle">
           <thead class="table-light">
             <tr>
@@ -243,6 +244,7 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
         {% else %}
         <p class="text-muted p-4 mb-0 small">
           Žádné kontaktní osoby.
@@ -272,6 +274,7 @@
   </div>
   <div class="card-body p-0">
     {% if reminders %}
+    <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead class="table-light">
         <tr>
@@ -336,6 +339,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <p class="text-muted p-4 mb-0 small">
       Žádné remindry.
@@ -358,6 +362,7 @@
   </div>
   <div class="card-body p-0">
     {% if deals %}
+    <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead class="table-light">
         <tr>
@@ -403,6 +408,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <p class="text-muted p-4 mb-0 small">
       Žádné obchody.
@@ -422,6 +428,7 @@
   </div>
   <div class="card-body p-0">
     {% if interactions %}
+    <div class="table-responsive">
     <table class="table table-hover mb-0">
       <thead class="table-light">
         <tr>
@@ -468,6 +475,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <p class="text-muted p-4 mb-0">
       Zatím žádný kontakt.
@@ -486,6 +494,7 @@
     </span>
   </div>
   <div class="card-body p-0">
+    <div class="table-responsive">
     <table class="table table-sm mb-0 small">
       <thead class="table-light">
         <tr>
@@ -518,6 +527,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 </div>
 {% endif %}

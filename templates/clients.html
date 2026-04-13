@@ -50,6 +50,7 @@
 <div class="card">
   <div class="card-body p-0">
     {% if clients %}
+    <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead class="table-light">
         <tr>
@@ -124,6 +125,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <p class="text-muted p-4 mb-0">
       {% if q or size or temp or pipeline %}Žádný klient neodpovídá zadaným filtrům.

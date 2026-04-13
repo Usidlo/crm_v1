@@ -98,6 +98,7 @@
       </div>
       <div class="card-body p-0">
         {% if deal.contacts %}
+        <div class="table-responsive">
         <table class="table table-sm mb-0 align-middle">
           <tbody>
             {% for c in deal.contacts %}
@@ -121,6 +122,7 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
         {% else %}
         <p class="text-muted p-3 mb-0 small">Žádné kontaktní osoby. <a href="{{ url_for('edit_deal', id=deal.id) }}">Přiřadit.</a></p>
         {% endif %}
@@ -134,6 +136,7 @@
         <span class="fw-semibold small"><i class="bi bi-clock-history me-2 text-muted"></i>Historie změn</span>
       </div>
       <div class="card-body p-0">
+        <div class="table-responsive">
         <table class="table table-sm mb-0 small">
           <thead class="table-light">
             <tr>
@@ -162,6 +165,7 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
     {% endif %}

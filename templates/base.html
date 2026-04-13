@@ -8,85 +8,146 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <style>
     body { background: #f5f7fa; }
-    .sidebar {
-      min-height: 100vh;
+
+    /* ── Sidebar ── */
+    #sidebar {
       background: #1a2236;
       color: #cdd6f4;
       width: 220px;
+      min-height: 100vh;
       flex-shrink: 0;
     }
-    .sidebar .brand {
+    #sidebar .brand {
       font-size: 1.3rem;
       font-weight: 700;
       color: #fff;
       padding: 1.5rem 1.25rem 1rem;
       letter-spacing: .04em;
     }
-    .sidebar .nav-link {
+    #sidebar .nav-link {
       color: #9ba8c5;
       border-radius: 8px;
       margin: 2px 10px;
       padding: .55rem .9rem;
       font-size: .95rem;
     }
-    .sidebar .nav-link:hover, .sidebar .nav-link.active {
+    #sidebar .nav-link:hover, #sidebar .nav-link.active {
       background: #2d3a57;
       color: #fff;
     }
-    .sidebar .nav-link i { margin-right: 8px; }
-    .main-content { flex: 1; min-width: 0; padding: 2rem; }
-    .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,.08); border-radius: 12px; }
-    .badge-method {
-      font-size: .78rem;
-      padding: .3em .65em;
-      border-radius: 20px;
+    #sidebar .nav-link i { margin-right: 8px; }
+
+    /* Offcanvas sidebar na mobilu */
+    @media (max-width: 991.98px) {
+      #sidebar {
+        min-height: 100%;
+        width: 260px;
+      }
+      .offcanvas-header-close {
+        filter: invert(1);
+      }
     }
+
+    /* ── Layout ── */
+    .main-content { flex: 1; min-width: 0; padding: 1.5rem; }
+    @media (max-width: 575.98px) {
+      .main-content { padding: 1rem; }
+    }
+
+    /* ── Mobile top navbar ── */
+    .mobile-navbar {
+      background: #1a2236;
+      color: #fff;
+      padding: .6rem 1rem;
+    }
+
+    /* ── Cards & tables ── */
+    .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,.08); border-radius: 12px; }
+    .badge-method { font-size: .78rem; padding: .3em .65em; border-radius: 20px; }
     .table th { font-weight: 600; font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; color: #6c757d; }
+
+    /* Tabulky scrollovatelné na mobilu */
+    .table-responsive-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   </style>
 </head>
 <body>
+
+<!-- ── Mobile top navbar (jen na mobilu) ── -->
+<nav class="mobile-navbar d-flex d-lg-none align-items-center gap-3">
+  <button class="btn btn-sm btn-outline-light border-0"
+          data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-label="Menu">
+    <i class="bi bi-list fs-5"></i>
+  </button>
+  <span class="fw-bold" style="letter-spacing:.04em">Sales PD</span>
+  {% if unread_news_count > 0 %}
+  <a href="{{ url_for('novinky') }}" class="ms-auto">
+    <span class="badge bg-danger">{{ unread_news_count }}</span>
+  </a>
+  {% endif %}
+</nav>
+
+<!-- ── Wrapper ── -->
 <div class="d-flex">
-  <nav class="sidebar d-flex flex-column py-2">
-    <div class="brand">
+
+  <!-- ── Sidebar (offcanvas na mobilu, statický na desktopu) ── -->
+  <nav class="offcanvas-lg offcanvas-start sidebar d-flex flex-column py-2"
+       id="sidebar" tabindex="-1">
+
+    <!-- Zavírací tlačítko jen na mobilu -->
+    <div class="d-lg-none d-flex justify-content-end px-3 pt-1 pb-0">
+      <button class="btn btn-sm btn-outline-light border-0 offcanvas-header-close"
+              data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
+    <div class="brand d-none d-lg-block">
       <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="Sales PD"
            style="height:36px; object-fit:contain; margin-right:8px; vertical-align:middle;">
       Sales PD
     </div>
+    <div class="brand d-lg-none">
+      <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="Sales PD"
+           style="height:30px; object-fit:contain; margin-right:8px; vertical-align:middle;">
+      Sales PD
+    </div>
+
     <hr class="border-secondary mx-3 my-2">
+
     <ul class="nav flex-column px-1">
       <li class="nav-item">
         <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
-           href="{{ url_for('dashboard') }}">
+           href="{{ url_for('dashboard') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
           <i class="bi bi-speedometer2"></i>Přehled
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link {% if 'client' in (request.endpoint or '') %}active{% endif %}"
-           href="{{ url_for('clients') }}">
+           href="{{ url_for('clients') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
           <i class="bi bi-people"></i>Klienti
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link {% if 'member' in (request.endpoint or '') or request.endpoint == 'team' %}active{% endif %}"
-           href="{{ url_for('team') }}">
+           href="{{ url_for('team') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
           <i class="bi bi-person-badge"></i>Tým
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link {% if 'deal' in (request.endpoint or '') %}active{% endif %}"
-           href="{{ url_for('deals') }}">
+           href="{{ url_for('deals') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
           <i class="bi bi-briefcase"></i>Obchody
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link {% if 'reminder' in (request.endpoint or '') %}active{% endif %}"
-           href="{{ url_for('all_reminders') }}">
+           href="{{ url_for('all_reminders') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
           <i class="bi bi-bell"></i>Remindry
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link {% if request.endpoint == 'novinky' %}active{% endif %}"
-           href="{{ url_for('novinky') }}">
+           href="{{ url_for('novinky') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
           <i class="bi bi-newspaper"></i>Novinky
           {% if unread_news_count > 0 %}
           <span class="badge bg-danger ms-1" style="font-size:.65rem">{{ unread_news_count }}</span>
@@ -95,19 +156,20 @@
       </li>
       <li class="nav-item">
         <a class="nav-link {% if request.endpoint == 'report' %}active{% endif %}"
-           href="{{ url_for('report') }}">
+           href="{{ url_for('report') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
           <i class="bi bi-bar-chart-line"></i>Report
         </a>
       </li>
       {% if current_user and current_user.is_admin %}
       <li class="nav-item">
         <a class="nav-link {% if 'admin' in (request.endpoint or '') %}active{% endif %}"
-           href="{{ url_for('admin_users') }}">
+           href="{{ url_for('admin_users') }}" data-bs-dismiss="offcanvas" data-bs-target="#sidebar">
           <i class="bi bi-shield-lock"></i>Uživatelé
         </a>
       </li>
       {% endif %}
     </ul>
+
     <div class="mt-auto px-3 pb-3 d-flex flex-column gap-2">
       {% if current_user %}
       <div class="text-center small text-secondary pb-1">
@@ -147,6 +209,7 @@
     </div>
   </nav>
 
+  <!-- ── Hlavní obsah ── -->
   <div class="main-content">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for cat, msg in messages %}
@@ -160,6 +223,7 @@
     {% block content %}{% endblock %}
   </div>
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
