@@ -272,9 +272,11 @@ CONTACT_TYPE_COLORS = {
 }
 
 CONTACT_ROLE_LABELS = {
-    'hr':         'HR',
-    'management': 'Management',
-    'other':      'Jiná',
+    'hr':           'HR',
+    'management':   'Management',
+    'production':   'Výroba / produkce',
+    'sales':        'Obchod',
+    'other':        'Jiná',
 }
 
 TRUST_LEVEL_LABELS = {
