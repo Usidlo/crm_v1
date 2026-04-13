@@ -1631,19 +1631,22 @@ def delete_contact(id):
     contact = ContactPerson.query.get_or_404(id)
     client_id = contact.client_id
     contact_name = contact.name
-    # Odpojit ze všech obchodů (deal_contact M2M)
-    contact.deals = []
-    # Nullify interakcí přes ORM (backref 'interactions')
-    for interaction in list(contact.interactions):
-        interaction.contact_person_id = None
-    # Nullify novinek přes ORM (backref 'news_items')
-    for news_item in list(contact.news_items):
-        news_item.contact_id = None
-    db.session.flush()
-    _audit('contact', id, 'delete')
-    db.session.delete(contact)
-    db.session.commit()
-    flash(f'Kontaktní osoba „{contact_name}" byla smazána.', 'warning')
+    try:
+        # Raw SQL — nejspolehlivější, obchází ORM cache
+        db.session.execute(text('DELETE FROM deal_contact WHERE contact_id = :id'), {'id': id})
+        db.session.execute(text('UPDATE interaction SET contact_person_id = NULL WHERE contact_person_id = :id'), {'id': id})
+        db.session.execute(text('UPDATE client_news SET contact_id = NULL WHERE contact_id = :id'), {'id': id})
+        db.session.flush()
+        # Expiruj ORM cache, aby delete neviděl staré FK
+        db.session.expire(contact)
+        contact = ContactPerson.query.get(id)
+        _audit('contact', id, 'delete')
+        db.session.delete(contact)
+        db.session.commit()
+        flash(f'Kontaktní osoba „{contact_name}" byla smazána.', 'warning')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Chyba při mazání: {e}', 'danger')
     return redirect(url_for('client_detail', id=client_id))
 
 
