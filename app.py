@@ -1890,7 +1890,8 @@ def delete_reminder(id):
 def all_interactions():
     q          = request.args.get('q', '').strip()
     member_id  = request.args.get('member', '').strip()
-    date_from  = request.args.get('date_from', '').strip()
+    default_from = (datetime.utcnow() - timedelta(days=14)).strftime('%Y-%m-%d')
+    date_from  = request.args.get('date_from', default_from).strip()
     date_to    = request.args.get('date_to', '').strip()
 
     query = Interaction.query.join(Client).join(TeamMember)
