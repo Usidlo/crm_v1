@@ -192,6 +192,7 @@
         <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
            href="{{ url_for('dashboard') }}">
           <i class="bi bi-speedometer2"></i>Přehled
+          {% if nameday_name %}<span class="badge ms-1" style="background:#f59e0b;font-size:.6rem">🎂</span>{% endif %}
         </a>
       </li>
       <li class="nav-item">

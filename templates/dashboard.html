@@ -18,6 +18,25 @@
   {% endif %}
 </div>
 
+<!-- Dnešní svátky -->
+{% if nd_name and nd_contacts %}
+<div class="alert alert-warning d-flex align-items-center gap-3 mb-4 py-2 px-3" style="border-radius:12px">
+  <span style="font-size:1.4rem">🎂</span>
+  <div>
+    <strong>Dnes slaví {{ nd_name }}</strong> —
+    {% for c in nd_contacts %}
+      <a href="{{ url_for('client_detail', id=c.client_id) }}" class="fw-semibold text-decoration-none">{{ c.name }}</a>
+      <span class="text-muted small">({{ c.client.name }})</span>{% if not loop.last %}, {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% elif nd_name %}
+<div class="alert alert-light d-flex align-items-center gap-2 mb-4 py-2 px-3" style="border-radius:12px; border:1px solid #dee2e6">
+  <span>🗓️</span>
+  <span class="text-muted small">Dnes má svátek <strong>{{ nd_name }}</strong> — žádný shodný kontakt.</span>
+</div>
+{% endif %}
+
 <!-- Statistiky -->
 <div class="row g-3 mb-4">
   <div class="col-sm-6 col-lg-3">
