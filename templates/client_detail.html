@@ -116,7 +116,12 @@
         <div class="text-muted small fw-semibold mb-1">Poznámky</div>
         <div class="small">{{ client.notes }}</div>
         {% endif %}
-        <div class="text-muted small mt-2">Přidán {{ (client.created_at | prague).strftime('%d.%m.%Y') }}</div>
+        <div class="text-muted small mt-2">
+          Přidán {{ (client.created_at | prague).strftime('%d.%m.%Y') }}
+          {% if creator_log and creator_log.user %}
+          — <span class="fw-semibold">{{ creator_log.user.username }}</span>
+          {% endif %}
+        </div>
       </div>
     </div>
 

@@ -761,11 +761,15 @@ def client_detail(id):
                  .order_by(AuditLog.created_at.desc()).limit(50).all())
     members = TeamMember.query.order_by(TeamMember.name).all()
     all_clusters = Cluster.query.order_by(Cluster.name).all()
+    creator_log = (AuditLog.query
+                   .filter_by(entity_type='client', entity_id=id, action='create')
+                   .order_by(AuditLog.created_at.asc()).first())
     now = now_prague()
     return render_template('client_detail.html', client=client,
                            interactions=interactions, reminders=reminders,
                            deals=deals, audit_log=audit_log,
-                           members=members, all_clusters=all_clusters, now=now)
+                           members=members, all_clusters=all_clusters,
+                           creator_log=creator_log, now=now)
 
 
 @app.route('/clients/<int:id>/edit', methods=['GET', 'POST'])
@@ -2065,6 +2069,8 @@ def import_clients():
                     size_category=size_val if size_val in SIZE_LABELS else None,
                 )
                 db.session.add(client)
+                db.session.flush()
+                _audit('client', client.id, 'create')
                 added += 1
             except Exception:
                 errors += 1
