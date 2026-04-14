@@ -5,8 +5,9 @@
 <div class="d-flex align-items-center mb-4 gap-3 flex-wrap">
   <h2 class="fw-bold mb-0 me-auto">Obchody</h2>
   <form class="d-flex gap-2 align-items-center flex-wrap" method="get">
+    {% if group %}<input type="hidden" name="group" value="{{ group }}">{% endif %}
     <input class="form-control" name="q" value="{{ q }}" placeholder="Hledat…" style="width:160px">
-    <select class="form-select" name="status" style="width:155px">
+    <select class="form-select" name="status" style="width:175px">
       <option value="">Všechny statusy</option>
       {% for key, label in pipeline_labels.items() %}
       <option value="{{ key }}" {% if status_filter == key %}selected{% endif %}>{{ label }}</option>
@@ -20,7 +21,7 @@
     </select>
     <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-search"></i></button>
     {% if q or status_filter or owner_filter %}
-    <a href="{{ url_for('deals') }}" class="btn btn-outline-danger btn-sm" title="Zrušit filtry">
+    <a href="{{ url_for('deals', group=group) }}" class="btn btn-outline-danger btn-sm" title="Zrušit filtry">
       <i class="bi bi-x-lg"></i>
     </a>
     {% endif %}
@@ -30,7 +31,25 @@
   </a>
 </div>
 
-<div class="card">
+{% macro deal_table(title, icon, color, deals, total, group_key) %}
+<div class="card mb-4">
+  <div class="card-header bg-white d-flex align-items-center py-3">
+    <span class="fw-semibold me-auto">
+      <i class="bi {{ icon }} me-2 text-{{ color }}"></i>{{ title }}
+      <span class="badge bg-{{ color }} ms-1" style="font-size:.7rem">{{ total }}</span>
+    </span>
+    {% if group == group_key %}
+    <a href="{{ url_for('deals', q=q, owner=owner_filter, status=status_filter) }}"
+       class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Zpět na přehled
+    </a>
+    {% elif total > 10 %}
+    <a href="{{ url_for('deals', group=group_key, q=q, owner=owner_filter, status=status_filter) }}"
+       class="btn btn-sm btn-outline-secondary">
+      Zobrazit vše ({{ total }})
+    </a>
+    {% endif %}
+  </div>
   <div class="card-body p-0">
     {% if deals %}
     <div class="table-responsive">
@@ -66,7 +85,7 @@
           <td class="small text-muted">{{ d.next_step or '—' }}</td>
           <td class="small text-muted">{{ (d.updated_at | prague).strftime('%d.%m.%Y') }}</td>
           <td class="text-end">
-            <a href="{{ url_for('deal_detail', id=d.id) }}" class="btn btn-sm btn-outline-secondary" title="Detail">
+            <a href="{{ url_for('deal_detail', id=d.id) }}" class="btn btn-sm btn-outline-secondary">
               <i class="bi bi-eye"></i>
             </a>
           </td>
@@ -76,11 +95,14 @@
     </table>
     </div>
     {% else %}
-    <p class="text-muted p-4 mb-0">
-      {% if q or status_filter or owner_filter %}Žádný obchod neodpovídá zadaným filtrům.
-      {% else %}Zatím žádné obchody. <a href="{{ url_for('new_deal') }}">Přidat první obchod.</a>{% endif %}
-    </p>
+    <p class="text-muted p-4 mb-0 small">Žádné záznamy.</p>
     {% endif %}
   </div>
 </div>
+{% endmacro %}
+
+{{ deal_table('Aktivní obchody',  'bi-funnel',       'primary',   active_deals,   active_total,   'active')   }}
+{{ deal_table('Běžící zakázky',   'bi-play-circle',  'success',   running_deals,  running_total,  'running')  }}
+{{ deal_table('Neaktivní',        'bi-archive',      'secondary', inactive_deals, inactive_total, 'inactive') }}
+
 {% endblock %}

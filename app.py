@@ -239,6 +239,7 @@ PIPELINE_LABELS = {
     'won':         'Vyhráno',
     'onboarding':  'Zajišťování rozjezdu',
     'running':     'Běžící zakázka',
+    'completed':   'Ukončená zakázka',
     'lost':        'Prohráno',
     'blacklist':   'Blacklist',
 }
@@ -253,9 +254,18 @@ PIPELINE_COLORS = {
     'won':         'success',
     'onboarding':  'info',
     'running':     'success',
+    'completed':   'secondary',
     'lost':        'danger',
     'blacklist':   'dark',
 }
+
+PIPELINE_ACTIVE   = ['new_lead', 'ready', 'contacted', 'responded', 'negotiation', 'offer', 'won']
+PIPELINE_RUNNING  = ['onboarding', 'running', 'completed']
+PIPELINE_INACTIVE = ['lost', 'blacklist']
+# Pořadí zobrazení aktivních: Vyhráno nejdřív, Nový lead poslední
+PIPELINE_ACTIVE_DISPLAY_ORDER = {k: i for i, k in enumerate(
+    ['won', 'offer', 'negotiation', 'responded', 'contacted', 'ready', 'new_lead']
+)}
 
 PIPELINE_ORDER = {k: i for i, k in enumerate(PIPELINE_LABELS)}
 
@@ -1747,20 +1757,41 @@ def export_contacts():
 @app.route('/deals')
 @login_required
 def deals():
-    status_filter = request.args.get('status', '').strip()
+    q             = request.args.get('q', '').strip()
     owner_filter  = request.args.get('owner', '').strip()
-    q = request.args.get('q', '').strip()
-    query = Deal.query.join(Client)
-    if status_filter:
-        query = query.filter(Deal.status == status_filter)
-    if owner_filter:
-        query = query.filter(Deal.owner_id == int(owner_filter))
-    if q:
-        query = query.filter(Client.name.ilike(f'%{q}%') | Deal.title.ilike(f'%{q}%'))
-    all_deals = query.order_by(Deal.updated_at.desc()).all()
+    status_filter = request.args.get('status', '').strip()
+    group         = request.args.get('group', '').strip()  # active | running | inactive | ''
+
+    def _fetch(statuses):
+        qry = Deal.query.join(Client).filter(Deal.status.in_(statuses))
+        if q:
+            qry = qry.filter(Client.name.ilike(f'%{q}%') | Deal.title.ilike(f'%{q}%'))
+        if owner_filter:
+            qry = qry.filter(Deal.owner_id == int(owner_filter))
+        if status_filter and status_filter in statuses:
+            qry = qry.filter(Deal.status == status_filter)
+        return qry.order_by(Deal.updated_at.desc()).all()
+
+    LIMIT = 10
+    active_all   = _fetch(PIPELINE_ACTIVE)
+    active_all.sort(key=lambda d: (
+        PIPELINE_ACTIVE_DISPLAY_ORDER.get(d.status, 99),
+        -(d.updated_at.timestamp() if d.updated_at else 0),
+    ))
+    running_all  = _fetch(PIPELINE_RUNNING)
+    inactive_all = _fetch(PIPELINE_INACTIVE)
+
     members = TeamMember.query.order_by(TeamMember.name).all()
-    return render_template('deals.html', deals=all_deals, members=members,
-                           status_filter=status_filter, owner_filter=owner_filter, q=q)
+    return render_template('deals.html',
+        active_deals   = active_all   if group == 'active'   else active_all[:LIMIT],
+        active_total   = len(active_all),
+        running_deals  = running_all  if group == 'running'  else running_all[:LIMIT],
+        running_total  = len(running_all),
+        inactive_deals = inactive_all if group == 'inactive' else inactive_all[:LIMIT],
+        inactive_total = len(inactive_all),
+        members=members,
+        q=q, owner_filter=owner_filter, status_filter=status_filter, group=group,
+    )
 
 
 @app.route('/deals/new', methods=['GET', 'POST'])
