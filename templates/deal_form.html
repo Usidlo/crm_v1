@@ -95,16 +95,17 @@
         </button>
         <a href="{{ url_for('deals') }}" class="btn btn-outline-secondary">Zrušit</a>
         {% if deal %}
-        <form method="post" action="{{ url_for('delete_deal', id=deal.id) }}"
-              class="ms-auto"
-              onsubmit="return confirm('Opravdu smazat tento obchod?')">
-          <button type="submit" class="btn btn-outline-danger btn-sm">
-            <i class="bi bi-trash me-1"></i>Smazat
-          </button>
-        </form>
+        <button type="button" class="btn btn-outline-danger btn-sm ms-auto"
+                onclick="if(confirm('Opravdu smazat tento obchod?')) document.getElementById('deleteDealForm').submit()">
+          <i class="bi bi-trash me-1"></i>Smazat
+        </button>
         {% endif %}
       </div>
     </form>
+    {% if deal %}
+    <form id="deleteDealForm" method="post"
+          action="{{ url_for('delete_deal', id=deal.id) }}" class="d-none"></form>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

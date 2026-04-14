@@ -30,16 +30,17 @@
         </button>
         <a href="{{ url_for('team') }}" class="btn btn-outline-secondary">Zrušit</a>
         {% if member %}
-        <form method="post" action="{{ url_for('delete_member', id=member.id) }}"
-              class="ms-auto"
-              onsubmit="return confirm('Smazat tohoto člena?')">
-          <button type="submit" class="btn btn-outline-danger btn-sm">
-            <i class="bi bi-trash me-1"></i>Smazat
-          </button>
-        </form>
+        <button type="button" class="btn btn-outline-danger btn-sm ms-auto"
+                onclick="if(confirm('Smazat tohoto člena?')) document.getElementById('deleteMemberForm').submit()">
+          <i class="bi bi-trash me-1"></i>Smazat
+        </button>
         {% endif %}
       </div>
     </form>
+    {% if member %}
+    <form id="deleteMemberForm" method="post"
+          action="{{ url_for('delete_member', id=member.id) }}" class="d-none"></form>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
