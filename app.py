@@ -237,6 +237,8 @@ PIPELINE_LABELS = {
     'negotiation': 'Jednání',
     'offer':       'Nabídka',
     'won':         'Vyhráno',
+    'onboarding':  'Zajišťování rozjezdu',
+    'running':     'Běžící zakázka',
     'lost':        'Prohráno',
     'blacklist':   'Blacklist',
 }
@@ -249,6 +251,8 @@ PIPELINE_COLORS = {
     'negotiation': 'warning',
     'offer':       'success',
     'won':         'success',
+    'onboarding':  'info',
+    'running':     'success',
     'lost':        'danger',
     'blacklist':   'dark',
 }
