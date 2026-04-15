@@ -2860,6 +2860,34 @@ def _weekly_digest():
 CLUSTER_COLORS = ['primary', 'success', 'danger', 'warning', 'info', 'secondary',
                   'dark', 'indigo', 'teal', 'orange']
 
+@app.route('/contacts-list')
+@login_required
+def contacts_list():
+    q           = request.args.get('q', '').strip()
+    role_filter = request.args.get('role', '').strip()
+    type_filter = request.args.get('type', '').strip()
+    trust_filter = request.args.get('trust', '').strip()
+
+    query = ContactPerson.query.join(Client).order_by(Client.name, ContactPerson.name)
+    if q:
+        query = query.filter(
+            ContactPerson.name.ilike(f'%{q}%') |
+            Client.name.ilike(f'%{q}%') |
+            ContactPerson.email.ilike(f'%{q}%')
+        )
+    if role_filter:
+        query = query.filter(ContactPerson.contact_role == role_filter)
+    if type_filter:
+        query = query.filter(ContactPerson.contact_type == type_filter)
+    if trust_filter:
+        query = query.filter(ContactPerson.trust_level == trust_filter)
+
+    contacts = query.all()
+    return render_template('contacts_list.html', contacts=contacts,
+                           q=q, role_filter=role_filter,
+                           type_filter=type_filter, trust_filter=trust_filter)
+
+
 @app.route('/clusters')
 @login_required
 def clusters():

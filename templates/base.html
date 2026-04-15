@@ -234,6 +234,12 @@
         </a>
       </li>
       <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'contacts_list' %}active{% endif %}"
+           href="{{ url_for('contacts_list') }}">
+          <i class="bi bi-person-lines-fill"></i>Kontaktní osoby
+        </a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link {% if 'member' in (request.endpoint or '') or request.endpoint == 'team' %}active{% endif %}"
            href="{{ url_for('team') }}">
           <i class="bi bi-person-badge"></i>Tým
