@@ -2906,10 +2906,15 @@ def edit_cluster(id):
 def delete_cluster(id):
     cluster = Cluster.query.get_or_404(id)
     name = cluster.name
-    cluster.clients = []   # remove M2M links
-    db.session.delete(cluster)
-    db.session.commit()
-    flash(f'Cluster „{name}" byl smazán.', 'success')
+    try:
+        db.session.execute(text('DELETE FROM client_cluster WHERE cluster_id = :id'), {'id': id})
+        db.session.flush()
+        db.session.delete(cluster)
+        db.session.commit()
+        flash(f'Cluster „{name}" byl smazán.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Chyba při mazání: {e}', 'danger')
     return redirect(url_for('clusters'))
 
 
