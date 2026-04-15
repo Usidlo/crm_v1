@@ -49,20 +49,21 @@
         </button>
         <a href="{{ url_for('cluster_detail', id=cluster.id) if cluster else url_for('clusters') }}"
            class="btn btn-outline-secondary">Zrušit</a>
-        {% if cluster %}
-        <button type="button" class="btn btn-outline-danger btn-sm ms-auto"
-                onclick="if(confirm('Opravdu smazat cluster „{{ cluster.name }}"? Klienti zůstanou zachováni.')) document.getElementById('deleteClusterForm').submit()">
-          <i class="bi bi-trash me-1"></i>Smazat
-        </button>
-        {% endif %}
       </div>
     </form>
-    {% if cluster %}
-    <form id="deleteClusterForm" method="post"
-          action="{{ url_for('delete_cluster', id=cluster.id) }}" class="d-none"></form>
-    {% endif %}
   </div>
 </div>
+
+{% if cluster %}
+<div class="mt-3" style="max-width:560px">
+  <form method="post" action="{{ url_for('delete_cluster', id=cluster.id) }}"
+        onsubmit="return confirm('Opravdu smazat cluster? Klienti zůstanou zachováni.')">
+    <button type="submit" class="btn btn-outline-danger btn-sm">
+      <i class="bi bi-trash me-1"></i>Smazat cluster
+    </button>
+  </form>
+</div>
+{% endif %}
 
 <script>
 document.querySelectorAll('.cluster-color-radio').forEach(function(radio) {
