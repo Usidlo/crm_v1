@@ -22,7 +22,7 @@
       {% if clients %}
       <div class="mb-3">
         <label class="form-label fw-semibold">Klient <span class="text-danger">*</span></label>
-        <select name="client_id" class="form-select" required>
+        <select name="client_id" id="clientSelect" class="form-select" required>
           <option value="">— vyberte klienta —</option>
           {% for c in clients %}
           <option value="{{ c.id }}"
@@ -62,29 +62,31 @@
                value="{{ deal.next_step if deal and deal.next_step else '' }}"
                placeholder="Co se má stát dál?">
       </div>
-      {% if client_contacts %}
-      <div class="mb-3">
+      <div class="mb-3" id="contactsSection">
         <label class="form-label fw-semibold">Kontaktní osoby</label>
-        <div class="border rounded p-2" style="max-height:180px;overflow-y:auto">
-          {% for c in client_contacts %}
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="contact_ids"
-                   value="{{ c.id }}" id="contact_{{ c.id }}"
-                   {% if deal and c in deal.contacts %}checked{% endif %}>
-            <label class="form-check-label small" for="contact_{{ c.id }}">
-              <span class="fw-semibold">{{ c.name }}</span>
-              {% if c.role %}<span class="text-muted"> — {{ c.role }}</span>{% endif %}
-              {% if c.contact_role %}
-              <span class="badge bg-light text-dark border ms-1" style="font-size:.65rem">
-                {{ contact_role_labels.get(c.contact_role, c.contact_role) }}
-              </span>
-              {% endif %}
-            </label>
-          </div>
-          {% endfor %}
+        <div id="contactsList" class="border rounded p-2" style="max-height:200px;overflow-y:auto">
+          {% if client_contacts %}
+            {% for c in client_contacts %}
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="contact_ids"
+                     value="{{ c.id }}" id="contact_{{ c.id }}"
+                     {% if deal and c in deal.contacts %}checked{% endif %}>
+              <label class="form-check-label small" for="contact_{{ c.id }}">
+                <span class="fw-semibold">{{ c.name }}</span>
+                {% if c.role %}<span class="text-muted"> — {{ c.role }}</span>{% endif %}
+                {% if c.contact_role %}
+                <span class="badge bg-light text-dark border ms-1" style="font-size:.65rem">
+                  {{ contact_role_labels.get(c.contact_role, c.contact_role) }}
+                </span>
+                {% endif %}
+              </label>
+            </div>
+            {% endfor %}
+          {% else %}
+          <p class="text-muted small mb-0">Nejprve vyberte klienta.</p>
+          {% endif %}
         </div>
       </div>
-      {% endif %}
       <div class="mb-4">
         <label class="form-label fw-semibold">Poznámky</label>
         <textarea name="notes" class="form-control" rows="3">{{ deal.notes if deal and deal.notes else '' }}</textarea>
@@ -98,6 +100,45 @@
     </form>
   </div>
 </div>
+
+<script>
+(function() {
+  var sel = document.getElementById('clientSelect');
+  if (!sel) return;
+
+  // Předvybrané kontakty z Pythonu (pro edit)
+  var preChecked = [{% if deal %}{% for c in deal.contacts %}{{ c.id }},{% endfor %}{% endif %}];
+
+  sel.addEventListener('change', function() {
+    var clientId = this.value;
+    var box = document.getElementById('contactsList');
+    if (!clientId) {
+      box.innerHTML = '<p class="text-muted small mb-0">Nejprve vyberte klienta.</p>';
+      return;
+    }
+    box.innerHTML = '<p class="text-muted small mb-0">Načítám…</p>';
+    fetch('/api/clients/' + clientId + '/contacts')
+      .then(function(r) { return r.json(); })
+      .then(function(contacts) {
+        if (!contacts.length) {
+          box.innerHTML = '<p class="text-muted small mb-0">Klient nemá žádné kontaktní osoby.</p>';
+          return;
+        }
+        box.innerHTML = contacts.map(function(c) {
+          var badge = c.contact_role_label
+            ? '<span class="badge bg-light text-dark border ms-1" style="font-size:.65rem">' + c.contact_role_label + '</span>'
+            : '';
+          var role = c.role ? '<span class="text-muted"> — ' + c.role + '</span>' : '';
+          return '<div class="form-check">'
+            + '<input class="form-check-input" type="checkbox" name="contact_ids" value="' + c.id + '" id="contact_' + c.id + '">'
+            + '<label class="form-check-label small" for="contact_' + c.id + '">'
+            + '<span class="fw-semibold">' + c.name + '</span>' + role + badge
+            + '</label></div>';
+        }).join('');
+      });
+  });
+})();
+</script>
 
 {% if deal %}
 <div class="mt-3" style="max-width:700px">

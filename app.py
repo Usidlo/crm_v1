@@ -1834,6 +1834,19 @@ def new_deal():
                            client_contacts=preselected_contacts)
 
 
+@app.route('/api/clients/<int:id>/contacts')
+@login_required
+def api_client_contacts(id):
+    contacts = ContactPerson.query.filter_by(client_id=id).order_by(ContactPerson.name).all()
+    return jsonify([{
+        'id':           c.id,
+        'name':         c.name,
+        'role':         c.role or '',
+        'contact_role': c.contact_role or '',
+        'contact_role_label': CONTACT_ROLE_LABELS.get(c.contact_role, ''),
+    } for c in contacts])
+
+
 @app.route('/deals/<int:id>')
 @login_required
 def deal_detail(id):
