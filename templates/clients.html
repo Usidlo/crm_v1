@@ -148,6 +148,7 @@
       {% else %}Zatím žádní klienti. <a href="{{ url_for('new_client') }}">Přidat prvního klienta.</a>{% endif %}
     </p>
     {% endif %}
+    {% include '_pagination.html' %}
   </div>
 </div>
 {% endblock %}

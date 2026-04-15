@@ -170,6 +170,34 @@ _CZ_MONTHS_GEN = [
 def format_czech_date(dt):
     return f"{dt.day}. {_CZ_MONTHS_GEN[dt.month - 1]}"
 
+
+def make_pagination(items, page, per_page):
+    """Vrátí stránkovaný výřez a objekt s metadaty stránkování."""
+    from types import SimpleNamespace
+    total = len(items)
+    pages = max(1, (total + per_page - 1) // per_page)
+    page  = max(1, min(page, pages))
+    start = (page - 1) * per_page
+
+    # Čísla stránek ke zobrazení (s mezerami)
+    visible = set()
+    visible.add(1)
+    visible.add(pages)
+    for p in range(max(1, page - 2), min(pages, page + 2) + 1):
+        visible.add(p)
+    page_numbers = []
+    for p in sorted(visible):
+        if page_numbers and p - page_numbers[-1] > 1:
+            page_numbers.append(None)   # None = "…"
+        page_numbers.append(p)
+
+    pag = SimpleNamespace(
+        page=page, pages=pages, total=total, per_page=per_page,
+        has_prev=page > 1, has_next=page < pages,
+        page_numbers=page_numbers,
+    )
+    return items[start:start + per_page], pag
+
 def get_todays_nameday_name():
     """Vrátí jméno dnešního svátku (nebo prázdný řetězec)."""
     return NAME_DAYS.get(now_prague().strftime('%m-%d'), '')
@@ -706,9 +734,14 @@ def clients():
         all_clients.sort(key=lambda c: (TEMP_ORDER.get(c.temperature, 3), (c.name or '').lower()))
 
     all_clusters = Cluster.query.order_by(Cluster.name).all()
-    return render_template('clients.html', clients=all_clients,
+    page = request.args.get('page', 1, type=int)
+    paged_clients, pagination = make_pagination(all_clients, page, 50)
+    return render_template('clients.html', clients=paged_clients,
                            q=q, size=size, temp=temp, pipeline=pipeline,
-                           cluster_id=cluster_id, all_clusters=all_clusters, sort=sort)
+                           cluster_id=cluster_id, all_clusters=all_clusters, sort=sort,
+                           pagination=pagination,
+                           url_params=dict(q=q, size=size, temp=temp, pipeline=pipeline,
+                                           cluster=cluster_id, sort=sort))
 
 
 @app.route('/clients/new', methods=['GET', 'POST'])
@@ -2220,11 +2253,16 @@ def all_interactions():
         except ValueError:
             pass
 
-    interactions = query.order_by(Interaction.date.desc()).limit(200).all()
+    all_ints = query.order_by(Interaction.date.desc()).all()
+    page = request.args.get('page', 1, type=int)
+    paged_ints, pagination = make_pagination(all_ints, page, 25)
     members = TeamMember.query.order_by(TeamMember.name).all()
-    return render_template('all_interactions.html', interactions=interactions,
+    return render_template('all_interactions.html', interactions=paged_ints,
                            members=members, q=q, member_id=member_id,
-                           date_from=date_from, date_to=date_to)
+                           date_from=date_from, date_to=date_to,
+                           pagination=pagination,
+                           url_params=dict(q=q, member=member_id,
+                                           date_from=date_from, date_to=date_to))
 
 
 @app.route('/clients/<int:client_id>/interactions/new', methods=['GET', 'POST'])
@@ -2882,10 +2920,15 @@ def contacts_list():
     if trust_filter:
         query = query.filter(ContactPerson.trust_level == trust_filter)
 
-    contacts = query.all()
-    return render_template('contacts_list.html', contacts=contacts,
+    all_contacts = query.all()
+    page = request.args.get('page', 1, type=int)
+    paged_contacts, pagination = make_pagination(all_contacts, page, 50)
+    return render_template('contacts_list.html', contacts=paged_contacts,
                            q=q, role_filter=role_filter,
-                           type_filter=type_filter, trust_filter=trust_filter)
+                           type_filter=type_filter, trust_filter=trust_filter,
+                           pagination=pagination,
+                           url_params=dict(q=q, role=role_filter,
+                                           type=type_filter, trust=trust_filter))
 
 
 @app.route('/clusters')
