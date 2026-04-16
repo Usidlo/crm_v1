@@ -486,12 +486,14 @@ class Interaction(db.Model):
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
     member_id = db.Column(db.Integer, db.ForeignKey('team_member.id'), nullable=False)
     contact_person_id = db.Column(db.Integer, db.ForeignKey('contact_person.id'), nullable=True)
+    deal_id = db.Column(db.Integer, db.ForeignKey('deal.id'), nullable=True)
     date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     method = db.Column(db.String(50), nullable=False)  # email, telefon, osobně, video
     subject = db.Column(db.String(300))
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     contact_person = db.relationship('ContactPerson', backref='interactions', lazy=True)
+    deal = db.relationship('Deal', backref='interactions', lazy=True)
 
 
 class ContactPerson(db.Model):
@@ -1887,7 +1889,11 @@ def deal_detail(id):
     audit_log = (AuditLog.query
                  .filter_by(entity_type='deal', entity_id=id)
                  .order_by(AuditLog.created_at.desc()).limit(30).all())
-    return render_template('deal_detail.html', deal=deal, audit_log=audit_log)
+    interactions = (Interaction.query
+                    .filter_by(deal_id=id)
+                    .order_by(Interaction.date.desc()).all())
+    return render_template('deal_detail.html', deal=deal, audit_log=audit_log,
+                           interactions=interactions)
 
 
 @app.route('/deals/<int:id>/edit', methods=['GET', 'POST'])
@@ -2271,14 +2277,19 @@ def new_interaction(client_id):
     client = Client.query.get_or_404(client_id)
     members = TeamMember.query.order_by(TeamMember.name).all()
     contacts = ContactPerson.query.filter_by(client_id=client_id).order_by(ContactPerson.name).all()
+    deals = Deal.query.filter_by(client_id=client_id).filter(
+        Deal.status.notin_(PIPELINE_INACTIVE)).order_by(Deal.title).all()
+    preselect_deal_id = request.args.get('deal_id', type=int)
     if request.method == 'POST':
         date_str = request.form['date']
         date = datetime.strptime(date_str, '%Y-%m-%dT%H:%M')
         contact_person_id = request.form.get('contact_person_id') or None
+        deal_id = request.form.get('deal_id') or None
         interaction = Interaction(
             client_id=client_id,
             member_id=int(request.form['member_id']),
             contact_person_id=int(contact_person_id) if contact_person_id else None,
+            deal_id=int(deal_id) if deal_id else None,
             date=date,
             method=request.form['method'],
             subject=request.form.get('subject', '').strip(),
@@ -2289,7 +2300,8 @@ def new_interaction(client_id):
         flash('Kontakt byl zaznamenán.', 'success')
         return redirect(url_for('client_detail', id=client_id))
     return render_template('interaction_form.html', client=client, members=members,
-                           contacts=contacts, interaction=None,
+                           contacts=contacts, deals=deals, interaction=None,
+                           preselect_deal_id=preselect_deal_id,
                            default_member_id=session.get('team_member_id'),
                            now=datetime.now().strftime('%Y-%m-%dT%H:%M'))
 
@@ -2300,12 +2312,15 @@ def edit_interaction(id):
     interaction = Interaction.query.get_or_404(id)
     members = TeamMember.query.order_by(TeamMember.name).all()
     contacts = ContactPerson.query.filter_by(client_id=interaction.client_id).order_by(ContactPerson.name).all()
+    deals = Deal.query.filter_by(client_id=interaction.client_id).order_by(Deal.title).all()
     if request.method == 'POST':
         date_str = request.form['date']
         interaction.date = datetime.strptime(date_str, '%Y-%m-%dT%H:%M')
         interaction.member_id = int(request.form['member_id'])
         contact_person_id = request.form.get('contact_person_id') or None
         interaction.contact_person_id = int(contact_person_id) if contact_person_id else None
+        deal_id = request.form.get('deal_id') or None
+        interaction.deal_id = int(deal_id) if deal_id else None
         interaction.method = request.form['method']
         interaction.subject = request.form.get('subject', '').strip()
         interaction.notes = request.form.get('notes', '').strip()
@@ -2313,7 +2328,8 @@ def edit_interaction(id):
         flash('Kontakt byl upraven.', 'success')
         return redirect(url_for('client_detail', id=interaction.client_id))
     return render_template('interaction_form.html', client=interaction.client,
-                           members=members, contacts=contacts, interaction=interaction,
+                           members=members, contacts=contacts, deals=deals,
+                           interaction=interaction,
                            now=interaction.date.strftime('%Y-%m-%dT%H:%M'))
 
 
@@ -2718,6 +2734,7 @@ with app.app_context():
             'ALTER TABLE client_news ADD COLUMN IF NOT EXISTS deal_id INTEGER REFERENCES deal(id)',
             'ALTER TABLE reminder ADD COLUMN IF NOT EXISTS notified BOOLEAN DEFAULT FALSE',
             'ALTER TABLE reminder ADD COLUMN IF NOT EXISTS notified_day BOOLEAN DEFAULT FALSE',
+            'ALTER TABLE interaction ADD COLUMN IF NOT EXISTS deal_id INTEGER REFERENCES deal(id)',
         ]
     else:
         migrations = [
@@ -2749,6 +2766,7 @@ with app.app_context():
             'ALTER TABLE client_news ADD COLUMN deal_id INTEGER REFERENCES deal(id)',
             'ALTER TABLE reminder ADD COLUMN notified BOOLEAN DEFAULT 0',
             'ALTER TABLE reminder ADD COLUMN notified_day BOOLEAN DEFAULT 0',
+            'ALTER TABLE interaction ADD COLUMN deal_id INTEGER REFERENCES deal(id)',
         ]
     with db.engine.connect() as conn:
         for sql in migrations:

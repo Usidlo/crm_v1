@@ -73,6 +73,24 @@
         {% endif %}
       </div>
 
+      {% if deals %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Zakázka</label>
+        <select name="deal_id" class="form-select">
+          <option value="">— bez zakázky —</option>
+          {% for d in deals %}
+          <option value="{{ d.id }}"
+            {% if interaction and interaction.deal_id == d.id %}selected
+            {% elif preselect_deal_id == d.id %}selected
+            {% endif %}>
+            {{ d.title }}
+          </option>
+          {% endfor %}
+        </select>
+        <div class="form-text text-muted">Volitelné — přiřadí kontakt ke konkrétní zakázce.</div>
+      </div>
+      {% endif %}
+
       <div class="mb-3">
         <label class="form-label fw-semibold">Předmět</label>
         <input type="text" name="subject" class="form-control"

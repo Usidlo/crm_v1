@@ -86,7 +86,7 @@
     {% endif %}
   </div>
 
-  <!-- Pravý sloupec: kontakty + audit -->
+  <!-- Pravý sloupec: kontakty + interakce + audit -->
   <div class="col-md-7">
     <!-- Kontaktní osoby -->
     <div class="card mb-3">
@@ -125,6 +125,76 @@
         </div>
         {% else %}
         <p class="text-muted p-3 mb-0 small">Žádné kontaktní osoby. <a href="{{ url_for('edit_deal', id=deal.id) }}">Přiřadit.</a></p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Historie kontaktů v zakázce -->
+    <div class="card mb-3">
+      <div class="card-header bg-white py-2 d-flex align-items-center">
+        <span class="fw-semibold small me-auto">
+          <i class="bi bi-chat-dots me-2 text-muted"></i>Historie kontaktů
+          <span class="badge bg-light text-dark border ms-1">{{ interactions | length }}</span>
+        </span>
+        <a href="{{ url_for('new_interaction', client_id=deal.client_id, deal_id=deal.id) }}"
+           class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-plus-lg me-1"></i>Zaznamenat
+        </a>
+      </div>
+      <div class="card-body p-0">
+        {% if interactions %}
+        <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Datum</th>
+              <th>Obchodník</th>
+              <th>Kontakt</th>
+              <th>Způsob</th>
+              <th>Předmět / Poznámka</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for i in interactions %}
+            <tr>
+              <td class="text-nowrap small">
+                {{ (i.date | prague).strftime('%d.%m.%Y') }}<br>
+                <span class="text-muted">{{ (i.date | prague).strftime('%H:%M') }}</span>
+              </td>
+              <td class="small fw-semibold">{{ i.member.name }}</td>
+              <td class="small">
+                {% if i.contact_person %}
+                  {{ i.contact_person.name }}
+                  {% if i.contact_person.role %}
+                    <span class="text-muted">({{ i.contact_person.role }})</span>
+                  {% endif %}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>{% include '_method_badge.html' %}</td>
+              <td class="small">
+                {% if i.subject %}<div class="fw-semibold">{{ i.subject }}</div>{% endif %}
+                {% if i.notes %}<div class="text-muted">{{ i.notes }}</div>{% endif %}
+                {% if not i.subject and not i.notes %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                <a href="{{ url_for('edit_interaction', id=i.id) }}"
+                   class="btn btn-sm btn-outline-secondary" title="Upravit">
+                  <i class="bi bi-pencil"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="text-muted p-3 mb-0 small">
+          Žádné kontakty přiřazené k této zakázce.
+          <a href="{{ url_for('new_interaction', client_id=deal.client_id, deal_id=deal.id) }}">Zaznamenat první.</a>
+        </p>
         {% endif %}
       </div>
     </div>
