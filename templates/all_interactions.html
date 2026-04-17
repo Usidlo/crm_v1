@@ -35,6 +35,7 @@
           <th>Klient</th>
           <th>Kontaktní osoba</th>
           <th>Způsob</th>
+          <th>Zakázka</th>
           <th>Předmět / Poznámka</th>
           <th></th>
         </tr>
@@ -63,6 +64,15 @@
             {% endif %}
           </td>
           <td>{% include '_method_badge.html' %}</td>
+          <td class="small">
+            {% if i.deal %}
+            <a href="{{ url_for('deal_detail', id=i.deal.id) }}" class="text-decoration-none">
+              <span class="badge bg-light text-dark border" style="font-size:.7rem">{{ i.deal.title }}</span>
+            </a>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
           <td class="small">
             {% if i.subject %}<div class="fw-semibold">{{ i.subject }}</div>{% endif %}
             {% if i.notes %}<div class="text-muted">{{ i.notes }}</div>{% endif %}
